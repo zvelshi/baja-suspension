@@ -63,8 +63,8 @@ class DoubleAArmHardpoints:
             "link_upper_rear": np.linalg.norm(hp.ubj - hp.ur),
             "link_lower_front": np.linalg.norm(hp.lbj - hp.lf),
             "link_lower_rear": np.linalg.norm(hp.lbj - hp.lr),
-            "link_tie_rod": np.linalg.norm(hp.tr_upright - hp.tr_chassis),
-            "link_shock_static": np.linalg.norm(hp.shock_a_arm - hp.shock_chassis),
+            "link_tie_rod": np.linalg.norm(hp.tr_chassis - hp.tr_upright),
+            "link_shock_static": np.linalg.norm(hp.shock_chassis - hp.shock_a_arm),
         }
 
 class DoubleAArm:
@@ -148,7 +148,7 @@ class DoubleAArm:
         f.append(np.linalg.norm(pts['tr_upright'] - hp.tr_chassis) - link_lengths['link_tie_rod'])
 
         # wanted length = static_len - travel (positive travel = bump)
-        f.append(np.linalg.norm(pts['shock_a_arm'] - hp.shock_chassis) - (link_lengths['link_shock_static'] - travel))
+        f.append(np.linalg.norm(pts['shock_a_arm'] - hp.shock_chassis) - (link_lengths['link_shock_static'] + travel))
 
         return np.asarray(f)
     
@@ -167,11 +167,7 @@ class DoubleAArm:
         hp = self.hp
 
         # move rack inboard np.ndarray in +y
-        hp_mod = hp.__class__(
-            **{
-                **hp.__dict__, "tr_chassis": hp.tr_chassis + np.array([steer, 0, 0])
-            }
-        )
+        hp_mod = hp.__class__(**{**hp.__dict__, "tr_chassis": hp.tr_chassis + np.array([0, steer, 0])})
 
         # initial guess
         x0 = np.hstack([self._t_prev, self._r_prev.as_rotvec()])
