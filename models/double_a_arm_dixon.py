@@ -102,7 +102,7 @@ class DixonDoubleAArm:
         self.hp = hp
         self.link_lengths = DoubleAArmHardpoints.link_lengths(hp)
 
-    def front_view_analysis(self, hp: DoubleAArmHardpoints, shock_bump: float) -> None:
+    def front_view_analysis(self, hp: DoubleAArmHardpoints, d_shock: float) -> None:
         # drop x component of points, points are now [y, z]
         hp = DoubleAArmHardpoints.points_yz(hp)
 
@@ -113,7 +113,7 @@ class DixonDoubleAArm:
         print("Lower arm midpoint (lm):", lm)
         print("Upper arm midpoint (um):", um)
 
-        # static angles, unchanging through bump
+        # static angles, unchanging through travel
         theta_ab0 = np.arctan2(hp.bjl[1] - lm[1], hp.bjl[0] - lm[0])
         theta_bd0 = np.arctan2((hp.bju[1] - hp.bjl[1]), (hp.bju[0] - hp.bjl[0]))
 
@@ -129,8 +129,8 @@ class DixonDoubleAArm:
         print("Upper arm length (l_cd):", l_cd)
         print("Ball joint axis length (l_bd):", l_bd)
 
-        # rotate upper a arm until shock length = l_s0 - shock_bump
-        target_l_s = l_s0 - shock_bump
+        # rotate upper a arm until shock length = l_s0 - d_shock
+        target_l_s = l_s0 - d_shock
 
         # create a 2x2 rotation matrix for angle phi
         R2 = lambda th: np.array([[np.cos(th), -np.sin(th)], [np.sin(th),  np.cos(th)]])
@@ -185,44 +185,85 @@ class DixonDoubleAArm:
         normal_rim = np.array([-axis_rim[1], axis_rim[0]])
         bumped_wc = B + s0 * axis_rim + t0 * normal_rim
 
+        wheel_contact0 = hp.wc - hp.wr * axis_rim0
+        wheel_contact_bumped = bumped_wc - hp.wr * axis_rim
+
         # print results
         fig, ax = plt.subplots(figsize=(10, 10))
 
         # plot the points
         ax.scatter(lm[0], lm[1], color='black', label='Lower Arm Midpoint (A)', s=100)
         ax.scatter(um[0], um[1], color='black', label='Upper Arm Midpoint (C)', s=100)
-        ax.scatter(hp.bjl[0], hp.bjl[1], color='green', label='Lower Ball Joint (b)', s=100)
-        ax.scatter(hp.bju[0], hp.bju[1], color='green', label='Upper Ball Joint (d)', s=100)
-        ax.scatter(B[0], B[1], color='blue', label='Lower Arm Outboard Point (B)', s=100)
-        ax.scatter(D[0], D[1], color='red', label='Upper Arm Outboard Point (D)', s=100)
-        ax.scatter(M[0], M[1], color='orange', label='Shock Outboard Point (M)', s=100)
-        ax.scatter(hp.wc[0], hp.wc[1], color='purple', label='Static Wheel Center (WC)', s=100)
-        ax.scatter(bumped_wc[0], bumped_wc[1], color='purple', label='Bumped Wheel Center (WC)', s=100)
+
+        ax.scatter(hp.bjl[0], hp.bjl[1], color='green', label='Lower Ball Joint (B)', s=100)
+        ax.scatter(hp.bju[0], hp.bju[1], color='green', label='Upper Ball Joint (D)', s=100)
+
+        ax.scatter(B[0], B[1], color='green', s=100)
+        ax.scatter(D[0], D[1], color='green', s=100)
+        
+        ax.scatter(hp.shock_a_arm[0], hp.shock_a_arm[1], color='orange', label='Shock Outboard Point', s=100)
+        ax.scatter(M[0], M[1], color='orange', s=100)
+        
+        ax.scatter(hp.wc[0], hp.wc[1], color='purple', label='Wheel Center', s=100)
+        ax.scatter(bumped_wc[0], bumped_wc[1], color='purple', s=100)
    
+        ax.scatter(wheel_contact0[0], wheel_contact0[1], color='purple', marker='x', s=100)
+        ax.scatter(wheel_contact_bumped[0], wheel_contact_bumped[1], color='purple', marker='x', label='Wheel Contact Point', s=100)
+
         # plot the links
-        ax.plot([hp.bjl[0], lm[0]], [hp.bjl[1], lm[1]], color='blue', label='Lower Arm (a-b)', linewidth=2)
-        ax.plot([lm[0], B[0]], [lm[1], B[1]], color='blue', linestyle='--', label='Lower Arm Bump (a-b)', linewidth=2)
-        ax.plot([hp.bju[0], um[0]], [hp.bju[1], um[1]], color='red', label='Upper Arm (c-d)', linewidth=2)
-        ax.plot([um[0], D[0]], [um[1], D[1]], color='red', linestyle='--', label='Upper Arm Bump (c-d)', linewidth=2)
-        ax.plot([B[0], D[0]], [B[1], D[1]], color='green', linestyle='--', label='New Ball Joint Axis (b-d)', linewidth=2)
-        ax.plot([hp.bjl[0], hp.bju[0]], [hp.bjl[1], hp.bju[1]], color='green', label='Old Ball Joint Axis (b-d)', linewidth=2)
-        ax.plot([hp.shock_chassis[0], M[0]], [hp.shock_chassis[1], M[1]], color='orange', linestyle='--', label='Shock (chassis-a arm)', linewidth=2)
-        ax.plot([hp.shock_chassis[0], hp.shock_a_arm[0]], [hp.shock_chassis[1], hp.shock_a_arm[1]], color='orange', label='Shock (chassis-a arm static)', linewidth=2)
+        ax.plot(
+            [hp.bjl[0], lm[0]], 
+            [hp.bjl[1], lm[1]], 
+            color='blue', label='Lower Arm (a-b)', linewidth=2)
+        ax.plot(
+            [lm[0], B[0]], 
+            [lm[1], B[1]], 
+            color='blue', linestyle='--', label='Lower Arm* (a*-b*)', linewidth=2)
+        ax.plot(
+            [hp.bju[0], um[0]], 
+            [hp.bju[1], um[1]], 
+            color='red', label='Upper Arm (c-d)', linewidth=2)
+        ax.plot(
+            [um[0], D[0]], 
+            [um[1], D[1]], 
+            color='red', linestyle='--', label='Upper Arm* (c*-d*)', linewidth=2)
+        ax.plot(
+            [hp.bjl[0], hp.bju[0]], 
+            [hp.bjl[1], hp.bju[1]], 
+            color='green', label='Ball Joint Axis (b-d)', linewidth=2)
+        ax.plot(
+            [B[0], D[0]], 
+            [B[1], D[1]], 
+            color='green', linestyle='--', label='Ball Joint Axis* (b*-d*)', linewidth=2)
+        ax.plot(
+            [hp.shock_chassis[0], hp.shock_a_arm[0]], 
+            [hp.shock_chassis[1], hp.shock_a_arm[1]], color='orange', label='Shock (chassis-a arm)', linewidth=2)
+        ax.plot(
+            [hp.shock_chassis[0], M[0]], 
+            [hp.shock_chassis[1], M[1]], 
+            color='orange', linestyle='--', label='Shock* (chassis-a arm)', linewidth=2)
 
         # wheel camber axis
         ax.plot(
             [hp.wc[0] + hp.wr * axis_rim0[0], hp.wc[0] - hp.wr * axis_rim0[0]], 
             [hp.wc[1] + hp.wr * axis_rim0[1], hp.wc[1] - hp.wr * axis_rim0[1]], 
-            color='purple', linestyle=':', label='Static Wheel Camber Axis', linewidth=2)
+            color='purple', linestyle=':', label='Wheel Camber Axis', linewidth=2)
         ax.plot(
             [bumped_wc[0] + hp.wr * axis_rim[0], bumped_wc[0] - hp.wr * axis_rim[0]], 
             [bumped_wc[1] + hp.wr * axis_rim[1], bumped_wc[1] - hp.wr * axis_rim[1]], 
-            color='purple', linestyle=':', label='Bumped Wheel Camber Axis', linewidth=2)
+            color='purple', linestyle=':', label='Wheel Camber Axis*', linewidth=2)
+
+        # suspension bump and scrub
+        bump = hp.wc[1] - bumped_wc[1]
+        scrub = hp.wc[0] - bumped_wc[0]
+
+        print(f"Suspension Bump: {bump:.2f}mm")
+        print(f"Suspension Scrub: {scrub:.2f}mm")
 
         ax.grid(True)
         ax.set_xlabel('Y Axis (mm)')
         ax.set_ylabel('Z Axis (mm)')
-        ax.set_title(f'{-shock_bump}mm Shock Bump Analysis')
+        ax.set_title(f'{-d_shock}mm Shock Travel Front View')
         ax.legend()
         ax.invert_xaxis()
         plt.show()
