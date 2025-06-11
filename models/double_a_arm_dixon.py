@@ -32,10 +32,10 @@ class DoubleAArmHardpoints:
     shock_a_arm: np.ndarray # shock a arm
 
     # wheel points
-    wc: np.ndarray  # wheel center point
-    ws: np.ndarray  # wheel spindle
-    wr: float       # wheel radius
-    ww: float       # wheel width
+    wc: np.ndarray          # wheel center point
+    wr: float               # wheel radius
+    ww: float               # wheel width
+    static_camber: float    # static camber angle in degrees
 
     @classmethod
     def from_yml(self, yml_path: str) -> "DoubleAArmHardpoints":
@@ -55,9 +55,9 @@ class DoubleAArmHardpoints:
             shock_chassis=np.array(data['shock_chassis']),
             shock_a_arm=np.array(data['shock_a_arm']),
             wc=np.array(data['wheel_center']),
-            ws=np.array(data['wheel_spindle']),
             wr=data['wheel_radius'],
             ww=data['wheel_width'],
+            static_camber=data['static_camber'],
         )
     
     @classmethod
@@ -89,9 +89,9 @@ class DoubleAArmHardpoints:
             shock_chassis=np.array([hp.shock_chassis[1], hp.shock_chassis[2]]),
             shock_a_arm=np.array([hp.shock_a_arm[1], hp.shock_a_arm[2]]),
             wc=np.array([hp.wc[1], hp.wc[2]]),
-            ws=np.array([hp.ws[1], hp.ws[2]]),
-            wr=np.array(hp.wr),
-            ww=np.array(hp.ww),
+            wr=hp.wr,
+            ww=hp.ww,
+            static_camber=hp.static_camber,
         )
 
 class DixonDoubleAArm:
@@ -139,10 +139,9 @@ class DixonDoubleAArm:
             """diff between desired and current shock length."""
             shock_a_arm = um + R2(phi) @ (hp.shock_a_arm - um)
             return np.linalg.norm(hp.shock_chassis - shock_a_arm) - target_l_s
-        
 
         # initial guess for phi
-        phi_L, phi_R = np.deg2rad(-35), np.deg2rad(35)  # lower and upper bounds for phi
+        phi_L, phi_R = np.deg2rad(-35), np.deg2rad(35) # lower and upper bounds for phi
         fL, fR = shock_err(phi_L), shock_err(phi_R)
 
         # 20-intersection bisection method to find the angle phi that satisfies the shock length condition
@@ -171,11 +170,20 @@ class DixonDoubleAArm:
         B1, B2 = P2 + h * perp, P2 - h * perp  # two possible intersection points
         B = B1 if np.linalg.norm(B1 - hp.bjl) < np.linalg.norm(B2 - hp.bjl) else B2
 
-        # wheel center point
-        theta_bd = np.arctan2(D[1] - B[1], D[0] - B[0]) # new upright angle
-        dtheta = theta_bd - theta_bd0
-        d_WB = hp.wc - hp.bjl # vector from lower ball joint to wheel center
-        bwc = B + R2(dtheta) @ d_WB # bumped wheel center
+        # wheel center point and wheel camber axis
+        camber_rad = np.deg2rad(hp.static_camber)  # static camber angle in radians
+
+        axis_bd0 = (hp.bju - hp.bjl) / np.linalg.norm(hp.bju - hp.bjl)  # unit vector along the ball joint axis
+        axis_rim0  = R2(camber_rad) @ axis_bd0
+        normal_rim0 = np.array([-axis_rim0[1], axis_rim0[0]])
+        # theta_rim0 = theta_bd0 + np.deg2rad(hp.static_camber)  # static wheel camber angle in radians
+        s0 = float(np.dot((hp.wc - hp.bjl), axis_rim0)) # signed distance of wheel along BD
+        t0 = float(np.dot((hp.wc - hp.bjl), normal_rim0)) # signed distance of wheel normal to BD
+
+        axis_bd = (D - B) / np.linalg.norm(D - B)
+        axis_rim   = R2(camber_rad) @ axis_bd
+        normal_rim = np.array([-axis_rim[1], axis_rim[0]])
+        bumped_wc = B + s0 * axis_rim + t0 * normal_rim
 
         # print results
         fig, ax = plt.subplots(figsize=(10, 10))
@@ -189,7 +197,7 @@ class DixonDoubleAArm:
         ax.scatter(D[0], D[1], color='red', label='Upper Arm Outboard Point (D)', s=100)
         ax.scatter(M[0], M[1], color='orange', label='Shock Outboard Point (M)', s=100)
         ax.scatter(hp.wc[0], hp.wc[1], color='purple', label='Static Wheel Center (WC)', s=100)
-        ax.scatter(bwc[0], bwc[1], color='purple', label='Bumped Wheel Center (WC)', s=100)
+        ax.scatter(bumped_wc[0], bumped_wc[1], color='purple', label='Bumped Wheel Center (WC)', s=100)
    
         # plot the links
         ax.plot([hp.bjl[0], lm[0]], [hp.bjl[1], lm[1]], color='blue', label='Lower Arm (a-b)', linewidth=2)
@@ -200,7 +208,17 @@ class DixonDoubleAArm:
         ax.plot([hp.bjl[0], hp.bju[0]], [hp.bjl[1], hp.bju[1]], color='green', label='Old Ball Joint Axis (b-d)', linewidth=2)
         ax.plot([hp.shock_chassis[0], M[0]], [hp.shock_chassis[1], M[1]], color='orange', linestyle='--', label='Shock (chassis-a arm)', linewidth=2)
         ax.plot([hp.shock_chassis[0], hp.shock_a_arm[0]], [hp.shock_chassis[1], hp.shock_a_arm[1]], color='orange', label='Shock (chassis-a arm static)', linewidth=2)
-    
+
+        # wheel camber axis
+        ax.plot(
+            [hp.wc[0] + hp.wr * axis_rim0[0], hp.wc[0] - hp.wr * axis_rim0[0]], 
+            [hp.wc[1] + hp.wr * axis_rim0[1], hp.wc[1] - hp.wr * axis_rim0[1]], 
+            color='purple', linestyle=':', label='Static Wheel Camber Axis', linewidth=2)
+        ax.plot(
+            [bumped_wc[0] + hp.wr * axis_rim[0], bumped_wc[0] - hp.wr * axis_rim[0]], 
+            [bumped_wc[1] + hp.wr * axis_rim[1], bumped_wc[1] - hp.wr * axis_rim[1]], 
+            color='purple', linestyle=':', label='Bumped Wheel Camber Axis', linewidth=2)
+
         ax.grid(True)
         ax.set_xlabel('Y Axis (mm)')
         ax.set_ylabel('Z Axis (mm)')
