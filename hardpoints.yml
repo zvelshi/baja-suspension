@@ -1,0 +1,51 @@
+# 2021 v1 hardpoints
+# inboard a arm points
+upper_front: [62.929, 200.000, 508.238]
+upper_rear: [340.606, 200.000, 448.597]
+lower_front: [35.733, 200.000, 405.928]
+lower_rear: [323.726, 200.000, 354.862]
+
+# upright joints
+ball_joint_upper: [154.974, 594.698, 445.893]
+ball_joint_lower: [117.461, 612.725, 230.466]
+
+# steering_points
+tie_rod_chassis: [71.998, 199.898, 459.413]
+tie_rod_upright: [96.385, 610.021, 370.178]
+
+# shock points
+shock_chassis: [288.910, 222.339, 794.112]
+shock_a_arm: [178.215, 503.896, 481.859]
+shock_min: 304.8
+shock_max: 469.9
+
+# wheel points
+wheel_center: [133.000, 699.611, 304.801]
+wheel_spindle: [133.000, 600.565, 304.801]
+
+# # test case
+# # in-board a-arm pivots
+# upper_front:  [0.0, 100.0, 500.0]
+# upper_rear:   [0.0, 100.0, 500.0]
+# lower_front:  [0.0,  50.0, 300.0]
+# lower_rear:   [0.0,  50.0, 300.0]
+
+# # upright ball-joints
+# ball_joint_upper: [0.0, 405.0, 490.0]
+# ball_joint_lower: [0.0, 450.0, 310.0]
+
+# # tie-rod (not used in your front-view routine but needed for the dataclass)
+# tie_rod_chassis:  [0.0, 0.0, 0.0]
+# tie_rod_upright:  [0.0, 0.0, 0.0]
+
+# # shock points
+# shock_chassis:    [0.0,  25.0, 1200.0]
+# shock_a_arm:      [0.0, 370.0,  500.0]
+
+# # wheel
+# wheel_center:     [0.0, 550.0, 515.0]
+# wheel_spindle:    [0.0,   0.0,   0.0]
+
+wheel_radius:     300 # ~23in diameter
+wheel_width:      200 # ~8in width
+static_camber:    10 # degrees
