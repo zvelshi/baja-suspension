@@ -103,6 +103,7 @@ class DixonDoubleAArm:
         self.link_lengths = DoubleAArmHardpoints.link_lengths(hp)
 
     def front_view_analysis(self, hp: DoubleAArmHardpoints, d_shock: float) -> None:
+               
         # drop x component of points, points are now [y, z]
         hp = DoubleAArmHardpoints.points_yz(hp)
 
@@ -110,24 +111,9 @@ class DixonDoubleAArm:
         lm = (hp.lf + hp.lr) / 2  # A - the midpoint of the lower arm inboard points
         um = (hp.uf + hp.ur) / 2  # C - the midpoint of the upper arm inboard points
 
-        print("Lower arm midpoint (lm):", lm)
-        print("Upper arm midpoint (um):", um)
-
-        # static angles, unchanging through travel
-        theta_ab0 = np.arctan2(hp.bjl[1] - lm[1], hp.bjl[0] - lm[0])
-        theta_bd0 = np.arctan2((hp.bju[1] - hp.bjl[1]), (hp.bju[0] - hp.bjl[0]))
-
-        print("Static angle of lower arm (theta_ab0):", theta_ab0)
-        print("Static angle of ball joint axis (theta_bd0):", theta_bd0)
-
         l_ab = np.linalg.norm(lm - hp.bjl)      # length of lower arm link
-        l_cd = np.linalg.norm(hp.bju - um)      # length of upper arm link
         l_bd = np.linalg.norm(hp.bju - hp.bjl)  # length of ball joint axis
         l_s0 = np.linalg.norm(hp.shock_chassis - hp.shock_a_arm)  # static shock length
-
-        print("Lower arm length (l_ab):", l_ab)
-        print("Upper arm length (l_cd):", l_cd)
-        print("Ball joint axis length (l_bd):", l_bd)
 
         # rotate upper a arm until shock length = l_s0 - d_shock
         target_l_s = l_s0 - d_shock
@@ -144,8 +130,8 @@ class DixonDoubleAArm:
         phi_L, phi_R = np.deg2rad(-35), np.deg2rad(35) # lower and upper bounds for phi
         fL, fR = shock_err(phi_L), shock_err(phi_R)
 
-        # 20-intersection bisection method to find the angle phi that satisfies the shock length condition
-        for _ in range(20):
+        # 50-intersection bisection method to find the angle phi that satisfies the shock length condition
+        for _ in range(50):
             phi_M = 0.5 * (phi_L + phi_R)
             fM = shock_err(phi_M)
             if np.abs(fM) < 1e-6:
@@ -157,7 +143,7 @@ class DixonDoubleAArm:
         phi = phi_M # the angle to rotate the upper arm to achieve the desired shock length
                 
         # new locations of the arm shock eye and upper bj
-        M = um + R2(phi) @ (hp.shock_a_arm - um)
+        shock_a_arm = um + R2(phi) @ (hp.shock_a_arm - um)
         D = um + R2(phi) @ (hp.bju - um)
 
         v = D - lm
@@ -176,7 +162,6 @@ class DixonDoubleAArm:
         axis_bd0 = (hp.bju - hp.bjl) / np.linalg.norm(hp.bju - hp.bjl)  # unit vector along the ball joint axis
         axis_rim0  = R2(camber_rad) @ axis_bd0
         normal_rim0 = np.array([-axis_rim0[1], axis_rim0[0]])
-        # theta_rim0 = theta_bd0 + np.deg2rad(hp.static_camber)  # static wheel camber angle in radians
         s0 = float(np.dot((hp.wc - hp.bjl), axis_rim0)) # signed distance of wheel along BD
         t0 = float(np.dot((hp.wc - hp.bjl), normal_rim0)) # signed distance of wheel normal to BD
 
@@ -202,7 +187,7 @@ class DixonDoubleAArm:
         ax.scatter(D[0], D[1], color='green', s=100)
         
         ax.scatter(hp.shock_a_arm[0], hp.shock_a_arm[1], color='orange', label='Shock Outboard Point', s=100)
-        ax.scatter(M[0], M[1], color='orange', s=100)
+        ax.scatter(shock_a_arm[0], shock_a_arm[1], color='orange', s=100)
         
         ax.scatter(hp.wc[0], hp.wc[1], color='purple', label='Wheel Center', s=100)
         ax.scatter(bumped_wc[0], bumped_wc[1], color='purple', s=100)
@@ -239,8 +224,8 @@ class DixonDoubleAArm:
             [hp.shock_chassis[0], hp.shock_a_arm[0]], 
             [hp.shock_chassis[1], hp.shock_a_arm[1]], color='orange', label='Shock (chassis-a arm)', linewidth=2)
         ax.plot(
-            [hp.shock_chassis[0], M[0]], 
-            [hp.shock_chassis[1], M[1]], 
+            [hp.shock_chassis[0], shock_a_arm[0]], 
+            [hp.shock_chassis[1], shock_a_arm[1]], 
             color='orange', linestyle='--', label='Shock* (chassis-a arm)', linewidth=2)
 
         # wheel camber axis
