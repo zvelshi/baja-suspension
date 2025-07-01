@@ -48,4 +48,4 @@ wheel_spindle: [133.000, 600.565, 304.801]
 
 wheel_radius:     300 # ~23in diameter
 wheel_width:      200 # ~8in width
-static_camber:    10 # degrees
+static_camber:    0 # degrees

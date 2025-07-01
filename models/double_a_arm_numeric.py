@@ -1,5 +1,6 @@
 # default
 from __future__ import annotations
+from typing import Dict
 
 # third-party
 import numpy as np
@@ -7,7 +8,7 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation as R
 
 # ours
-from hardpoints import DoubleAArmHardpoints
+from scripts.hardpoints import DoubleAArmHardpoints
 
 class DoubleAArmNumeric:
     """Numeric kinematics for a single double‑A‑arm corner."""
@@ -20,11 +21,43 @@ class DoubleAArmNumeric:
         self._shock0 = self.len["shock_static"]
         self._tierod0 = self.len["tie_rod"]
 
+    def reset(self):
+        # reset the prev x to the default guess
+        self._x_prev = np.hstack([self.hp.bjl, np.zeros(3)])
+
     @staticmethod
     def _rot(eul: np.ndarray) -> np.ndarray:
         return R.from_euler("xyz", eul).as_matrix()
     
-    def solve_from_damper(
+    def _rim_points(self, wc: np.ndarray, Rw: np.ndarray) -> Dict[str, np.ndarray]:
+        # wheel axis in world
+        n = Rw[:, 1]
+        
+        def project(axis: np.ndarray):
+            v = axis - np.dot(axis, n) * n
+            l2 = np.dot(v, v)
+            return None if l2 < 1e-9 else wc + v / np.sqrt(l2) * self.hp.wr
+        
+        pts = {}
+        xp = project(np.array([1., 0., 0.]))
+        if xp is not None:
+            pts["W_Xp"] = xp
+            pts["W_Xm"] = wc - (xp - wc)
+
+        # should never be needed
+        yp = project(np.array([0., 1., 0.]))
+        if yp is not None:
+            pts["W_Yp"] = yp
+            pts["W_Ym"] = wc - (yp - wc)
+
+        zp = project(np.array([0., 0., 1.]))
+        if zp is not None:
+            pts["W_Zp"] = zp
+            pts["W_Zm"] = wc - (zp - wc)
+
+        return pts
+    
+    def solve(
             self,
             travel_mm : float | None = None,
             bump_z    : float | None = None,
@@ -84,7 +117,7 @@ class DoubleAArmNumeric:
         self._x_prev = sol.x.copy()
 
         p, e = sol.x[:3], sol.x[3:]
-        Rw   = self._rot(e)
+        Rw   = self._rot(e) # wheel rot matrix
         world = lambda v: p + Rw @ v
 
         lbj   = p
@@ -97,15 +130,18 @@ class DoubleAArmNumeric:
         if not (hp.shock_min <= shock_len <= hp.shock_max):
             # print(f"shock length {shock_len:.1f} mm outside [{hp.shock_min},{hp.shock_max}] mm for travel={travel_mm:+.1f} mm, steer={steer_mm:+.1f} mm")
             return
-
-        return {
+        
+        step = {
             "lower_ball_joint": lbj,
             "upper_ball_joint": ubj,
             "wheel_center"    : wc,
             "shock_a_arm"     : sha,
-            "shock_length"    : shock_len,
             "tie_rod_chassis" : tr_chassis_offset,
             "tie_rod_upright" : tr_up,
-            "travel_mm"       : travel_mm,
-            "steer_mm"        : steer_mm,
         }
+        
+        # get wheel points
+        step.update(self._rim_points(wc, Rw))
+
+        # return resolved points
+        return step

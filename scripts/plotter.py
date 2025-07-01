@@ -1,5 +1,6 @@
 # default
-from typing import Dict, Tuple
+from typing import Dict, List
+from enum import Enum, auto
 
 # third party
 import numpy as np
@@ -7,9 +8,14 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # ours
-from hardpoints import DoubleAArmHardpoints
+from scripts.hardpoints import DoubleAArmHardpoints
 
-class Plotter:
+class SCALAR_CHARACTERISTIC(Enum):
+    CAMBER = auto()
+    CASTER = auto()
+    TOE    = auto()
+
+class DoubleAArmPlotter:
     def __init__(self, hp: DoubleAArmHardpoints):
         self.hp = hp
         self._path: list[np.ndarray] = []
@@ -93,7 +99,50 @@ class Plotter:
         path = np.asarray(self._path)
         self.path_line.set_data(path[:, 0], path[:, 1])
         self.path_line.set_3d_properties(path[:, 2])
-        plt.draw(); plt.pause(1e-4)
+        plt.draw(); plt.pause(1e-9)
+
+    def display(self):
+        plt.ioff(); plt.show()
+
+class Plotter2DBase:
+    def __init__(self, char: SCALAR_CHARACTERISTIC):
+        self.char = char
+
+        # per-characteristic labels
+        titles = {
+            SCALAR_CHARACTERISTIC.CAMBER: ("Camber vs Step", "Camber [deg]"),
+            SCALAR_CHARACTERISTIC.CASTER: ("Caster vs Step", "Caster [deg]"),
+            SCALAR_CHARACTERISTIC.TOE   : ("Toe vs Step",    "Toe [deg]"),
+        }
+        self._title, self._ylabel = titles[char]
+
+        self._xs: List[int] = []
+        self._ys: List[float] = []
+
+        self._init_figure()
+
+    def _init_figure(self):
+        self.fig = plt.figure(figsize=(4, 3))
+        self.ax: plt.Axes = self.fig.add_subplot(111)
+        self.ax.set_xlabel("Step")
+        self.ax.set_ylabel(self._ylabel)
+        self.ax.set_title(self._title)
+        self.ax.grid(True, linestyle=":", linewidth=0.5)
+
+        self._line, = self.ax.plot([], [], "-o", lw=1.5)
+
+        plt.ion()
+        plt.show(block=False)
+
+    def update(self, attitude: Dict[str, float]):
+        """Append the current value (deg) taken from *attitude* dict."""
+        value = attitude[self.char.name.lower()]      # keys: camber/caster/toe
+        self._xs.append(len(self._ys))
+        self._ys.append(value)
+
+        self._line.set_data(self._xs, self._ys)
+        self.ax.relim(); self.ax.autoscale_view()
+        plt.draw()
 
     def display(self):
         plt.ioff(); plt.show()
