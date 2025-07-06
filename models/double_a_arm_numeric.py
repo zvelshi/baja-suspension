@@ -8,22 +8,20 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation as R
 
 # ours
-from scripts.hardpoints import DoubleAArmHardpoints
+from scripts.hardpoints import DoubleAArm
 
 class DoubleAArmNumeric:
-    """Numeric kinematics for a single double‑A‑arm corner."""
-
-    def __init__(self, hp: DoubleAArmHardpoints):
+    def __init__(self, hp: DoubleAArm):
         self.hp = hp
-        self.len = DoubleAArmHardpoints.link_lengths(hp)
-        self._x_prev = np.hstack([hp.bjl, np.zeros(3)]) # seed guess
+        self.len = DoubleAArm.link_lengths(hp)
+        self._x_prev = np.hstack([hp.lbj, np.zeros(3)]) # seed guess
         self._wc0 = hp.wc[2]
         self._shock0 = self.len["shock_static"]
         self._tierod0 = self.len["tie_rod"]
 
     def reset(self):
         # reset the prev x to the default guess
-        self._x_prev = np.hstack([self.hp.bjl, np.zeros(3)])
+        self._x_prev = np.hstack([self.hp.lbj, np.zeros(3)])
 
     @staticmethod
     def _rot(eul: np.ndarray) -> np.ndarray:
@@ -68,49 +66,57 @@ class DoubleAArmNumeric:
 
         hp = self.hp
         target_shock = self._shock0 - travel_mm if travel_mm is not None else None
+        if not (hp.shock_min <= target_shock <= hp.shock_max):
+            return None
+        
         target_wheel = self._wc0 + bump_z if bump_z is not None else None
 
         target_tie   = self.len["tie_rod"]
-        tr_chassis_offset = hp.tr_chassis + np.array([0.0, steer_mm, 0.0])
+        tr_ib_offset = hp.tr_ib + np.array([0.0, steer_mm, 0.0])
 
-        # local coords (bjl frame)
-        bju_loc  = hp.bju - hp.bjl
-        tr_up_loc= hp.tr_upright  - hp.bjl
-        wc_loc   = hp.wc - hp.bjl
+        # local coords (lbj frame)
+        ubj_loc = hp.ubj - hp.lbj
+        tr_ob_loc = hp.tr_ob - hp.lbj
+        wc_loc = hp.wc - hp.lbj
 
-        # local coords (bju frame)
-        sh_vec = hp.shock_a_arm - hp.bju
+        # local coords (ubj frame)
+        sh_vec = hp.s_ob - hp.ubj
 
         def res(x):
             p, e = x[:3], x[3:]
-            Rw   = self._rot(e)
+            Rw = self._rot(e)
             world = lambda v: p + Rw @ v
 
-            bjl   = p
-            bju   = world(bju_loc)
-            tr_up = world(tr_up_loc)
-            sha   = bju + sh_vec
+            lbj   = p
+            ubj   = world(ubj_loc)
+            tr_ob = world(tr_ob_loc)
+            sha   = ubj + sh_vec
             wc    = world(wc_loc)
 
             r = np.empty(6)
             
             # 4 a arms
-            r[0] = np.linalg.norm(hp.uf - bju) - self.len["upper_front"]
-            r[1] = np.linalg.norm(hp.ur - bju) - self.len["upper_rear"]
-            r[2] = np.linalg.norm(hp.lf - bjl) - self.len["lower_front"]
-            r[3] = np.linalg.norm(hp.lr - bjl) - self.len["lower_rear"]
+            r[0] = np.linalg.norm(hp.uf - ubj) - self.len["upper_front"]
+            r[1] = np.linalg.norm(hp.ur - ubj) - self.len["upper_rear"]
+            r[2] = np.linalg.norm(hp.lf - lbj) - self.len["lower_front"]
+            r[3] = np.linalg.norm(hp.lr - lbj) - self.len["lower_rear"]
             
             # tie-rod
-            r[4] = np.linalg.norm(tr_chassis_offset - tr_up) - target_tie
+            r[4] = np.linalg.norm(tr_ib_offset - tr_ob) - target_tie
             
             # shock / wheel
-            r[5] = (np.linalg.norm(hp.shock_chassis - sha) - target_shock if travel_mm is not None else wc[2] - target_wheel)
+            r[5] = (np.linalg.norm(hp.s_ib - sha) - target_shock if travel_mm is not None else wc[2] - target_wheel)
 
             return r
 
         lb = np.array([0.0, 0.0, -np.inf, -np.inf, -np.inf, -np.pi/2])
         ub = np.array([ np.inf, np.inf,  np.inf,  np.inf,  np.inf,  np.pi/2])
-        sol = least_squares(res, self._x_prev, bounds=(lb, ub), xtol=1e-9)
+        sol = least_squares(
+            res, 
+            self._x_prev, 
+            bounds=(lb, ub), 
+            xtol=1e-9,
+        )
         if not sol.success:
             return
             # raise RuntimeError(sol.message)
@@ -120,24 +126,19 @@ class DoubleAArmNumeric:
         Rw   = self._rot(e) # wheel rot matrix
         world = lambda v: p + Rw @ v
 
-        lbj   = p
-        ubj   = world(bju_loc)
-        wc    = world(wc_loc)
-        sha   = ubj + sh_vec
-        tr_up = world(tr_up_loc)
-
-        shock_len = float(np.linalg.norm(hp.shock_chassis - sha))
-        if not (hp.shock_min <= shock_len <= hp.shock_max):
-            # print(f"shock length {shock_len:.1f} mm outside [{hp.shock_min},{hp.shock_max}] mm for travel={travel_mm:+.1f} mm, steer={steer_mm:+.1f} mm")
-            return
+        lbj = p
+        ubj = world(ubj_loc)
+        wc = world(wc_loc)
+        sha = ubj + sh_vec
+        tr_ob = world(tr_ob_loc)
         
         step = {
-            "lower_ball_joint": lbj,
-            "upper_ball_joint": ubj,
-            "wheel_center"    : wc,
-            "shock_a_arm"     : sha,
-            "tie_rod_chassis" : tr_chassis_offset,
-            "tie_rod_upright" : tr_up,
+            "lbj": lbj,
+            "ubj": ubj,
+            "wc": wc,
+            "s_ob": sha,
+            "tr_ib": tr_ib_offset,
+            "tr_ob": tr_ob,
         }
         
         # get wheel points
