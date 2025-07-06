@@ -1,0 +1,58 @@
+# 2024 final hardpoints - 2023-10-08
+
+baja_2024:
+  shock_min: 304.8
+  shock_max: 469.9
+  wheel_radius: 300 # ~23in diameter
+  wheel_width: 200 # ~8in width
+
+  front:
+    _type: 'DoubleAArm'
+
+    # inboard a arm points
+    upper_a_arm_front:  [153.040, 220.000, 530.427]
+    upper_a_arm_rear:   [375.653, 220.000, 478.451]
+    lower_a_arm_front:  [126.018, 200.000, 395.454]
+    lower_a_arm_rear:   [385.861, 200.000, 335.364]
+
+    # upright joints
+    upper_ball_joint: [235.500, 623.594, 380.887]
+    lower_ball_joint: [220.000, 652.000, 205.000]
+
+    # steering_points
+    tie_rod_inboard:  [111.823, 229.000, 500.000]
+    tie_rod_outboard: [159.600, 643.423, 352.461]
+
+    # shock points
+    shock_inboard:  [346.356, 270.283, 791.181]
+    shock_outboard: [248.023, 553.571, 434.522]
+
+    # wheel points
+    wheel_center:   [230.000, 695.000, 305.066]
+    wheel_spindle:  [230.000, 579.302, 300.377]
+
+  rear:
+    _type: 'SemiTrailingLink'
+
+    # trailing link point
+    trailing_link_front:  [1230.000, 275.773, 409.857]
+
+    # camber link points
+    upper_camber_link_inboard:  [1877.000, 60.000, 439.981]
+    upper_camber_link_outboard: [1788.087, 548.000, 344.246]
+    lower_camber_link_inboard:  [1877.000, 60.000, 389.981]
+    lower_camber_link_outboard: [1767.653, 548.000, 246.445]
+
+    # shock points
+    shock_inboard:  [1696.652, 266.760, 756.518]
+    shock_outboard: [1740.944, 511.791, 377.695]
+
+    # axle pivot points
+    pivot_inboard: [1764.000, 21.921, 431.857]
+    pivot_outboard: [1730.000, 480.000, 305.304]
+
+    pivot_inboard_max_angle: 0.5236 # rad
+    pivot_inboard_max_plunge: 90    # mm
+
+    # wheel points
+    wheel_center: [1730.000, 620.000, 305.304]
