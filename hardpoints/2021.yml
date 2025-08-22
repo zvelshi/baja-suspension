@@ -30,3 +30,26 @@ baja_2021:
     # wheel points
     wheel_center:  [133.000, 699.611, 304.801]
     wheel_spindle: [133.000, 600.565, 304.801]
+
+  rear:
+    _type: 'SemiTrailingLink'
+
+    # trailing link point
+    trailing_link_front:  [1128.298, 293.198, 510.790]
+
+    # camber link points
+    upper_camber_link_inboard:  [1746.469, 83.666, 470.276]
+    upper_camber_link_outboard: [1638.422, 528.000, 376.751]
+    lower_camber_link_inboard:  [1749.469, 85.074, 427.527]
+    lower_camber_link_outboard: [1636.024, 528.000, 295.217]
+
+    # shock points
+    shock_inboard:  [1563.000, 280.000, 724.650]
+    shock_outboard: [1563.000, 516.000, 367.650]
+
+    # axle pivot points
+    pivot_inboard: [1534.828, 83.200, 442.287]
+    pivot_outboard: [1563.000, 483.000, 304.801]
+
+    # wheel points
+    wheel_center: [1563.000, 617.000, 304.801]

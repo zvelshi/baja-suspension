@@ -51,8 +51,5 @@ baja_2024:
     pivot_inboard: [1764.000, 21.921, 431.857]
     pivot_outboard: [1730.000, 480.000, 305.304]
 
-    pivot_inboard_max_angle: 0.5236 # rad
-    pivot_inboard_max_plunge: 90    # mm
-
     # wheel points
     wheel_center: [1730.000, 620.000, 305.304]
