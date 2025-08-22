@@ -1,6 +1,7 @@
 # default
 import time
 from typing import Dict, Tuple
+import argparse
 
 # third party
 import numpy as np
@@ -12,93 +13,112 @@ from scripts.hardpoints import Vehicle
 from scripts.plotter import DoubleAArmPlotter, SemiTrailingLinkPlotter, CharacteristicPlotter, PointPlotter, SCALAR_CHARACTERISTIC, POINT_AXIS
 from scripts.utils.wheel_utils import wheel_attitude
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--hardpoints",
+    help="Specify hardpoints file under hardpoints/",
+)
+parser.add_argument(
+    "--sim_type",
+    help="Specify the type of sim to run: ['front', 'rear', 'vehicle']",
+)
+args = parser.parse_args()
+
+assert args.hardpoints, "Please specify a hardpoints yml to use using --hardpoints"
+hp_file = f"hardpoints/{args.hardpoints}.yml"
+
+assert args.sim_type in ['front', 'rear', 'vehicle']
+sim_type = args.sim_type
+
 if __name__ == "__main__":
-    vehicle: Vehicle = Vehicle("hardpoints/2024_final.yml")
+    vehicle: Vehicle = Vehicle(hp_file)
 
-    ### -- UNCOMMENT FOR FRONT SUSPENSION SIM -- ###
+    if sim_type == 'front':
 
-    # hp = vehicle.front_hp
-    # solver = DoubleAArmNumeric(hp)
+        hp = vehicle.front_hp
+        solver = DoubleAArmNumeric(hp)
 
-    # # plotters
-    # # 3d double a arm
-    # daa_plotter = DoubleAArmPlotter(hp)
-    
-    # # 2d scalar characteristics
-    # camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
-    # caster_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CASTER)
-    # toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
+        # plotters
+        # 3d double a arm
+        daa_plotter = DoubleAArmPlotter(hp)
+        
+        # 2d scalar characteristics
+        camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
+        caster_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CASTER)
+        toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
 
-    # # 2d specific points
-    # # ib_tr_plot   = PointPlotter("tie_rod_chassis", POINT_AXIS.Y)
+        # 2d specific points
+        # ib_tr_plot   = PointPlotter("tie_rod_chassis", POINT_AXIS.Y)
 
-    # sh_len = np.linspace(-200, 400, 300, True)
-    # bp_len = np.linspace(-80, 120, 20, True)
-    # st_len = np.linspace(-20, 20, 100, True)
+        sh_len = np.linspace(-200, 400, 300, True)
+        bp_len = np.linspace(-80, 120, 20, True)
+        st_len = np.linspace(-20, 20, 100, True)
 
-    # for x in sh_len:
-    #     step = solver.solve(travel_mm=x, steer_mm=0)
-    #     if step:
-    #         # 3d
-    #         daa_plotter.update(step)
+        for x in sh_len:
+            step = solver.solve(travel_mm=x, steer_mm=0)
+            if step:
+                # 3d
+                daa_plotter.update(step)
 
-    #         # 2d
-    #         att = wheel_attitude(step)
-    #         camber_plot.update(att)
-    #         caster_plot.update(att)
-    #         toe_plot.update(att)
+                # 2d
+                att = wheel_attitude(step)
+                camber_plot.update(att)
+                caster_plot.update(att)
+                toe_plot.update(att)
 
-    #         # ib_tr_plot.update(step)
+                # ib_tr_plot.update(step)
 
-    # # for y in st_len:
-    # #     step = solver.solve(travel_mm=0, steer_mm=y)
-    # #     print(y)
-    # #     if step:
-    # #         # 3d
-    # #         daa_plotter.update(step)
+        # for y in st_len:
+        #     step = solver.solve(travel_mm=0, steer_mm=y)
+        #     if step:
+        #         # 3d
+        #         daa_plotter.update(step)
 
-    # #         # 2d
-    # #         att = wheel_attitude(step)
-    # #         camber_plot.update(att)
-    # #         caster_plot.update(att)
-    # #         toe_plot.update(att)
+        #         # 2d
+        #         att = wheel_attitude(step)
+        #         camber_plot.update(att)
+        #         caster_plot.update(att)
+        #         toe_plot.update(att)
 
-    # #         # ib_tr_plot.update(step)
+                # ib_tr_plot.update(step)
 
-    # solver.reset()
+        solver.reset()
 
-    # daa_plotter.display()
-    # camber_plot.display()
-    # caster_plot.display()
-    # toe_plot.display()
-    # # ib_tr_plot.display()
+        daa_plotter.display()
+        camber_plot.display()
+        caster_plot.display()
+        toe_plot.display()
+        # ib_tr_plot.display()
 
-    ### -- UNCOMMENT FOR REAR SUSPENSION SIM -- ###
+    elif sim_type == 'rear':
 
-    # hp = vehicle.rear_hp
-    # solver = SemiTrailingLinkNumeric(hp)
+        hp = vehicle.rear_hp
+        solver = SemiTrailingLinkNumeric(hp)
 
-    # # plotters
-    # # 3d semi trailing link
-    # stl_plotter = SemiTrailingLinkPlotter(hp)
+        # plotters
+        # 3d semi trailing link
+        stl_plotter = SemiTrailingLinkPlotter(hp)
 
-    # # 2d scalar characteristics
-    # camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
-    # toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
+        # 2d scalar characteristics
+        camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
+        toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
 
-    # sh_len = np.linspace(-200, 400, 300, True)
-    # for x in sh_len:
-    #     step = solver.solve(travel_mm=x)
-    #     if step:
-    #         # 3d
-    #         stl_plotter.update(step)
+        sh_len = np.linspace(-200, 400, 300, True)
+        for x in sh_len:
+            step = solver.solve(travel_mm=x)
+            if step:
+                # 3d
+                stl_plotter.update(step)
 
-    #         # 2d
-    #         att = wheel_attitude(step)
-    #         camber_plot.update(att)
-    #         toe_plot.update(att)
+                # 2d
+                att = wheel_attitude(step)
+                camber_plot.update(att)
+                toe_plot.update(att)
 
-    # solver.reset()
-    # stl_plotter.display()
-    # camber_plot.display()
-    # toe_plot.display()
+        solver.reset()
+        stl_plotter.display()
+        camber_plot.display()
+        toe_plot.display()
+
+    else:
+        raise Exception(f"Invalid sim_type; {sim_type}")
