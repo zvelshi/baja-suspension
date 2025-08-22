@@ -91,6 +91,7 @@ class DoubleAArm(Hardpoints):
     tr_ob: np.ndarray       # tie rod outboard
 
     # shock points
+    s_loc: str              # mounting location of outboard shock point
     s_ib: np.ndarray        # shock inboard
     s_ob: np.ndarray        # shock outboard
 
@@ -108,6 +109,7 @@ class DoubleAArm(Hardpoints):
             lbj  =np.array(data['lower_ball_joint']),
             tr_ib=np.array(data['tie_rod_inboard']),
             tr_ob=np.array(data['tie_rod_outboard']),
+            s_loc=str(data['shock_location']),
             s_ib =np.array(data['shock_inboard']),
             s_ob =np.array(data['shock_outboard']),
             wc   =np.array(data['wheel_center']),

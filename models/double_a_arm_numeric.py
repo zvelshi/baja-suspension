@@ -19,6 +19,13 @@ class DoubleAArmNumeric:
         self._shock0 = self.len["shock_static"]
         self._tierod0 = self.len["tie_rod"]
 
+        if hp.s_loc == 'upper':
+            self.s_rel_pt = hp.ubj
+            print("Assuming Upper A Arm mounted shock point...")
+        else:
+            self.s_rel_pt = hp.lbj
+            print("Assuming Lower A Arm mounted shock point...")
+
     def reset(self):
         # reset the prev x to the default guess
         self._x_prev = np.hstack([self.hp.lbj, np.zeros(3)])
@@ -79,8 +86,9 @@ class DoubleAArmNumeric:
         tr_ob_loc = hp.tr_ob - hp.lbj
         wc_loc = hp.wc - hp.lbj
 
-        # local coords (ubj frame)
-        sh_vec = hp.s_ob - hp.ubj
+        # local coords
+        s_rel_pt = hp.ubj if hp.s_loc == 'upper' else hp.lbj
+        sh_vec = hp.s_ob - s_rel_pt
 
         def res(x):
             p, e = x[:3], x[3:]
@@ -90,8 +98,10 @@ class DoubleAArmNumeric:
             lbj   = p
             ubj   = world(ubj_loc)
             tr_ob = world(tr_ob_loc)
-            sha   = ubj + sh_vec
             wc    = world(wc_loc)
+
+            s_rel_pt_loc = ubj if hp.s_loc == 'upper' else lbj
+            sha   = s_rel_pt_loc + sh_vec
 
             r = np.empty(6)
             
@@ -129,9 +139,11 @@ class DoubleAArmNumeric:
         lbj = p
         ubj = world(ubj_loc)
         wc = world(wc_loc)
-        sha = ubj + sh_vec
         tr_ob = world(tr_ob_loc)
         
+        s_rel_pt_loc = ubj if hp.s_loc == 'upper' else lbj
+        sha = s_rel_pt_loc + sh_vec
+
         step = {
             "lbj": lbj,
             "ubj": ubj,
