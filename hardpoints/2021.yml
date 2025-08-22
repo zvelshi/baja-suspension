@@ -44,6 +44,7 @@ baja_2021:
     lower_camber_link_outboard: [1636.024, 528.000, 295.217]
 
     # shock points
+    shock_location: "upper"
     shock_inboard:  [1563.000, 280.000, 724.650]
     shock_outboard: [1563.000, 516.000, 367.650]
 

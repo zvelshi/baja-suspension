@@ -24,6 +24,7 @@ baja_2024:
     tie_rod_outboard: [159.600, 643.423, 352.461]
 
     # shock points
+    shock_location: "upper"
     shock_inboard:  [346.356, 270.283, 791.181]
     shock_outboard: [248.023, 553.571, 434.522]
 
