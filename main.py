@@ -50,13 +50,14 @@ if __name__ == "__main__":
         # 2d specific points
         # ib_tr_plot   = PointPlotter("tie_rod_chassis", POINT_AXIS.Y)
 
-        sh_len = np.linspace(-200, 400, 300, True)
+        sh_len = np.linspace(-400, 400, 800, True)
         bp_len = np.linspace(-80, 120, 20, True)
         st_len = np.linspace(-20, 20, 100, True)
 
         for x in sh_len:
             step = solver.solve(travel_mm=x, steer_mm=0)
             if step:
+
                 # 3d
                 daa_plotter.update(step)
 
