@@ -144,10 +144,6 @@ class SemiTrailingLink(Hardpoints):
     piv_ib:  np.ndarray      # in-board pivot center (cv)
     piv_ob:  np.ndarray      # out-board pivot center (cv)
 
-    # pivot characteristics
-    piv_max_angle: float     # pivot max angles (cv)
-    piv_ib_max_plunge: float # in-board pivot max plunge (cv)
-
     # wheel points
     wc: np.ndarray           # wheel center point
 
@@ -164,8 +160,6 @@ class SemiTrailingLink(Hardpoints):
             piv_ib=np.array(data['pivot_inboard']),
             piv_ob=np.array(data['pivot_outboard']),
             wc    =np.array(data['wheel_center']),
-            piv_max_angle    =float(data['pivot_inboard_max_angle']),
-            piv_ib_max_plunge=float(data['pivot_inboard_max_plunge']),
         )
 
     @classmethod
