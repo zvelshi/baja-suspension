@@ -1,0 +1,13 @@
+HARDPOINTS: '2026'
+TYPE:       'front'
+
+GRAPHS:
+  CAMBER:   True
+  TOE:      True
+  CASTER:   True
+  3D:       True
+
+SIM_CONFIG:
+  MIN:      -200
+  MAX:      200
+  STEP:     400
