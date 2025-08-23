@@ -19,6 +19,7 @@ class DoubleAArmNumeric:
         self._shock0 = self.len["shock_static"]
         self._tierod0 = self.len["tie_rod"]
 
+        self.s_rel_pt = hp.ubj
         if hp.s_loc == 'upper':
             self.s_rel_pt = hp.ubj
             print("Assuming Upper A Arm mounted shock point...")
@@ -73,9 +74,9 @@ class DoubleAArmNumeric:
 
         hp = self.hp
         target_shock = self._shock0 - travel_mm if travel_mm is not None else None
-        if not (hp.shock_min <= target_shock <= hp.shock_max):
+        if target_shock and not (hp.shock_min <= target_shock <= hp.shock_max):
             return None
-        
+    
         target_wheel = self._wc0 + bump_z if bump_z is not None else None
 
         target_tie   = self.len["tie_rod"]
@@ -115,12 +116,15 @@ class DoubleAArmNumeric:
             r[4] = np.linalg.norm(tr_ib_offset - tr_ob) - target_tie
             
             # shock / wheel
-            r[5] = (np.linalg.norm(hp.s_ib - sha) - target_shock if travel_mm is not None else wc[2] - target_wheel)
+            if target_shock:
+                r[5] = np.linalg.norm(hp.s_ib - sha) - target_shock
+            else:
+                r[5] = wc[2] - target_wheel
 
             return r
 
         lb = np.array([0.0, 0.0, -np.inf, -np.inf, -np.inf, -np.pi/2])
-        ub = np.array([ np.inf, np.inf,  np.inf,  np.inf,  np.inf,  np.pi/2])
+        ub = np.array([np.inf, np.inf, np.inf, np.inf, np.inf, np.pi/2])
         sol = least_squares(
             res, 
             self._x_prev, 
@@ -129,7 +133,6 @@ class DoubleAArmNumeric:
         )
         if not sol.success:
             return
-            # raise RuntimeError(sol.message)
         self._x_prev = sol.x.copy()
 
         p, e = sol.x[:3], sol.x[3:]
