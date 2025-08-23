@@ -1,8 +1,8 @@
 # 2024 final hardpoints - 2023-10-08
 
 baja_2024:
-  shock_min: 304.8
-  shock_max: 469.9
+  shock_min: 327.025
+  shock_max: 504.825
   wheel_radius: 300 # ~23in diameter
   wheel_width: 200 # ~8in width
 

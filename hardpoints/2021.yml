@@ -1,8 +1,8 @@
 # 2021 v1 hardpoints
 
 baja_2021:
-  shock_min: 304.8
-  shock_max: 469.9
+  shock_min: 327.025
+  shock_max: 504.825
   wheel_radius: 300 # ~23in diameter
   wheel_width: 200 # ~8in width
 
@@ -24,6 +24,7 @@ baja_2021:
     tie_rod_outboard: [96.385, 610.021, 370.178]
 
     # shock points
+    shock_location: "upper"
     shock_inboard:  [288.910, 222.339, 794.112]
     shock_outboard: [178.215, 503.896, 481.859]
 

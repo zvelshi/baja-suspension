@@ -2,7 +2,7 @@
 
 baja_2026:
   shock_min: 327.025
-  shock_max: 492.125
+  shock_max: 504.825
   wheel_radius: 300 # ~23in diameter
   wheel_width: 200 # ~8in width
 
