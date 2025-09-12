@@ -1,5 +1,5 @@
 ### Prereq set up:
-1. You'll need to install Python: https://www.python.org/downloads/ **IMPORTANT** make sure you check the box that asks if you want Python added to environment variables.
+1. You'll need to install Python: https://www.python.org/downloads/ **IMPORTANT** make sure you check the box that asks if you want python.exe added to PATH
 2. Click the <> Code button above on this repo
 3. click Download ZIP
 4. Unzip it in your location of choice
