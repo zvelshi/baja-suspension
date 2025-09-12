@@ -4,7 +4,8 @@
 3. click Download ZIP
 4. Unzip it in your location of choice
 5. Enter the baja-suspension folder in your file browser
-6. right click anywhere inside the folder and click 'Open in Terminal' (this might not work the same way on windows 10, but the goal is to be in the baja-suspension folder in a terminal. you can also just copy its path and cd to the path, or open the folder in VScode and open a terminal in there)
+6. Right click anywhere inside the folder and click 'Open in Terminal'
+ * This might not work the same way on windows 10, but the goal is to be in the baja-suspension folder in a terminal. You can also just copy its path and cd to the path, or open the folder in VScode and open a terminal in there
 7. Once you're in the terminal, do the following set up steps
 
 ### To set up:
@@ -24,17 +25,17 @@ python main.py --hardpoints <year> --sim_type <type>
 ```
 
 **Parameters:**
-- `--hardpoints`: Vehicle configuration year (`2021`, `2024`, or `2026`)
-- `--sim_type`: Suspension analysis type (`front`, `rear`, or `vehicle`)
+- `--hardpoints`: Vehicle hardpoints yaml located under `/hardpoints` -> [`2021`, `2024`, or `2026`]
+- `--sim_type`: Analysis type [`front`, `rear`, or `vehicle`]
 
 **Examples:**
 
-Analyze front double A-arm suspension with 2026 geometry
+Analyze front double A-arm suspension with 2026 hardpoints file
 ```
 python main.py --hardpoints 2026 --sim_type front
 ```
 
-Analyze rear semi-trailing link suspension with 2024 geometry
+Analyze rear semi-trailing link suspension with 2024 hardpoints file
 ```
 python main.py --hardpoints 2024 --sim_type rear
 ```
