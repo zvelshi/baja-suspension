@@ -1,4 +1,11 @@
-You'll need to install Python: https://www.python.org/downloads/, then do the following from inside a terminal in the baja-suspension folder.
+### Prereq set up:
+1. You'll need to install Python: https://www.python.org/downloads/ **IMPORTANT** make sure you check the box that asks if you want Python added to the PATH.
+2. Click the <> Code button above on this repo
+3. click Download ZIP
+4. Unzip it in your location of choice
+5. Enter the baja-suspension folder in your file browser
+6. right click anywhere inside the folder and click 'Open in Terminal' (this might not work the same way on windows 10, but the goal is to be in the baja-suspension folder in a terminal. you can also just copy its path and cd to the path, or open the folder in VScode and open a terminal in there)
+7. Once you're in the terminal, do the following set up steps
 
 ### To set up:
 1. Create and activate a virtual environment
