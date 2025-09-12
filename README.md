@@ -1,5 +1,4 @@
-You'll need to install Python: https://www.python.org/downloads/
-Then do the following from inside a terminal in the baja-suspension folder.
+You'll need to install Python: https://www.python.org/downloads/, then do the following from inside a terminal in the baja-suspension folder.
 
 ### To set up:
 1. Create and activate a virtual environment
