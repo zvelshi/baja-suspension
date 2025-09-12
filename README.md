@@ -19,6 +19,12 @@ venv\Scripts\activate # or 'source venv/bin/activate' on Mac
 pip install -e .
 ```
 
+You will only need to do the set up steps once. After that, to run it, you can:
+1. open the baja-suspension folder
+2. right click and 'Open in Terminal'
+3. Type `venv\Scripts\activate` to activate the venv
+4. Then do the following from the 'To Run' section (you can mix and match different parameters as needed, or try the examples below)
+
 ### To run:
 ```
 python main.py --hardpoints <year> --sim_type <type>
