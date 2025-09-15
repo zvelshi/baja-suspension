@@ -1,7 +1,7 @@
 # default
 import time
-from typing import Dict, Tuple
-import argparse
+from typing import Dict, Tuple, List
+import yaml
 
 # third party
 import numpy as np
@@ -9,119 +9,88 @@ import numpy as np
 # ours
 from models.double_a_arm_numeric import DoubleAArmNumeric
 from models.semi_trailing_numeric import SemiTrailingLinkNumeric
-from scripts.hardpoints import Vehicle
-from scripts.plotter import DoubleAArmPlotter, SemiTrailingLinkPlotter, CharacteristicPlotter, PointPlotter, SCALAR_CHARACTERISTIC, POINT_AXIS
+from scripts.hardpoints import Vehicle, DoubleAArm, SemiTrailingLink
+from scripts.plotter import PlotterBase, DoubleAArmPlotter, SemiTrailingLinkPlotter, CharacteristicPlotter, SCALAR_CHARACTERISTIC
 from scripts.utils.wheel_utils import wheel_attitude
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--hardpoints",
-    help="Specify hardpoints file under hardpoints/",
-)
-parser.add_argument(
-    "--sim_type",
-    help="Specify the type of sim to run: ['front', 'rear', 'vehicle']",
-)
-args = parser.parse_args()
-
-assert args.hardpoints, "Please specify a hardpoints yml to use using --hardpoints"
-hp_file = f"hardpoints/{args.hardpoints}.yml"
-
-assert args.sim_type in ['front', 'rear', 'vehicle']
-sim_type = args.sim_type
-
 if __name__ == "__main__":
+    with open("sim_config.yml", "r") as file:
+        config = yaml.safe_load(file)
+
+    hp_file = f"hardpoints/{config['HARDPOINTS']}.yml"
+
     vehicle: Vehicle = Vehicle(hp_file)
 
-    if sim_type == 'front':
+    plots: List[PlotterBase] = []
+    if config["PLOTS"]["CAMBER"]:
+        plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER))
+
+    if config["PLOTS"]["CASTER"] and config['TYPE'] == 'front':
+        plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.CASTER))
+
+    if config["PLOTS"]["TOE"]:
+        plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE))
+
+    if config['TYPE'] == 'front':
 
         hp = vehicle.front_hp
+        if not isinstance(hp, DoubleAArm):
+            raise TypeError("Expected DoubleAArm for front suspension, got {type(hp).__name__}")
         solver = DoubleAArmNumeric(hp)
 
-        # plotters
-        # 3d double a arm
-        daa_plotter = DoubleAArmPlotter(hp)
-        
-        # 2d scalar characteristics
-        camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
-        caster_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CASTER)
-        toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
+        if config["PLOTS"]["3D"]:
+            plots.append(DoubleAArmPlotter(hp))
 
-        # 2d specific points
-        # ib_tr_plot   = PointPlotter("tie_rod_chassis", POINT_AXIS.Y)
-
-        sh_len = np.linspace(-200, 200, 800, True)
-        bp_len = np.linspace(-80, 120, 20, True)
-        st_len = np.linspace(-20, 20, 100, True)
+        sh_len = np.linspace(config['SIM_CONFIG']['MIN'], config['SIM_CONFIG']['MAX'], config['SIM_CONFIG']['STEP'], True)
 
         for x in sh_len:
-            # step = solver.solve(travel_mm=x, steer_mm=0)
             step = solver.solve(bump_z=x, steer_mm=0)
 
             if step:
 
                 # 3d
-                daa_plotter.update(step)
+                plots[-1].update(step)
 
                 # 2d
                 att = wheel_attitude(step)
-                camber_plot.update(att)
-                caster_plot.update(att)
-                toe_plot.update(att)
-
-                # ib_tr_plot.update(step)
-
-        # for y in st_len:
-        #     step = solver.solve(travel_mm=0, steer_mm=y)
-        #     if step:
-        #         # 3d
-        #         daa_plotter.update(step)
-
-        #         # 2d
-        #         att = wheel_attitude(step)
-        #         camber_plot.update(att)
-        #         caster_plot.update(att)
-        #         toe_plot.update(att)
-
-                # ib_tr_plot.update(step)
+                for plot in plots[:-1]:
+                    plot.update(att)
 
         solver.reset()
 
-        daa_plotter.display()
-        camber_plot.display()
-        caster_plot.display()
-        toe_plot.display()
-        # ib_tr_plot.display()
+        for plot in plots:
+            plot.display()
 
-    elif sim_type == 'rear':
+    elif config['TYPE'] == 'rear':
 
         hp = vehicle.rear_hp
+        if not isinstance(hp, SemiTrailingLink):
+            raise TypeError("Expected SemiTrailingLink for rear suspension, got {type(hp).__name__}")
         solver = SemiTrailingLinkNumeric(hp)
 
         # plotters
         # 3d semi trailing link
-        stl_plotter = SemiTrailingLinkPlotter(hp)
+        if config["PLOTS"]["3D"]:
+            plots.append(SemiTrailingLinkPlotter(hp))
 
         # 2d scalar characteristics
         camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
         toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
 
-        sh_len = np.linspace(-200, 400, 300, True)
+        sh_len = np.linspace(config['SIM_CONFIG']['MIN'], config['SIM_CONFIG']['MAX'], config['SIM_CONFIG']['STEP'], True)
         for x in sh_len:
             step = solver.solve(travel_mm=x)
             if step:
                 # 3d
-                stl_plotter.update(step)
+                plots[-1].update(step)
 
                 # 2d
                 att = wheel_attitude(step)
-                camber_plot.update(att)
-                toe_plot.update(att)
+                for plot in plots[:-1]:
+                    plot.update(att)
 
         solver.reset()
-        stl_plotter.display()
-        camber_plot.display()
-        toe_plot.display()
-
+        for plot in plots:
+            plot.display()
     else:
-        raise Exception(f"Invalid sim_type; {sim_type}")
+        raise Exception(f"Invalid sim_type; {config['TYPE']}")
