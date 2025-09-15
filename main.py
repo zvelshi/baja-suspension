@@ -41,10 +41,18 @@ if __name__ == "__main__":
         if config["PLOTS"]["3D"]:
             plots.append(DoubleAArmPlotter(hp))
 
-        sh_len = np.linspace(config['SIM_CONFIG']['MIN'], config['SIM_CONFIG']['MAX'], config['SIM_CONFIG']['STEP'], True)
+        travel_values = (
+            np.linspace(config['TRAVEL']['MIN'], config['TRAVEL']['MAX'], config['SIM_STEPS'], True)
+            if config['TRAVEL']['ENABLE'] else [config['TRAVEL']['VALUE']]
+        )
 
-        for x in sh_len:
-            step = solver.solve(bump_z=x, steer_mm=0)
+        steer_values = (
+            np.linspace(config['STEER']['MIN'], config['STEER']['MAX'], config['SIM_STEPS'], True)
+            if config['STEER']['ENABLE'] else [config['STEER']['VALUE']]
+        )
+
+        for travel, steer in zip(travel_values, steer_values):
+            step = solver.solve(bump_z=travel, steer_mm=steer)
 
             if step:
 
@@ -68,18 +76,16 @@ if __name__ == "__main__":
             raise TypeError("Expected SemiTrailingLink for rear suspension, got {type(hp).__name__}")
         solver = SemiTrailingLinkNumeric(hp)
 
-        # plotters
-        # 3d semi trailing link
         if config["PLOTS"]["3D"]:
             plots.append(SemiTrailingLinkPlotter(hp))
 
-        # 2d scalar characteristics
-        camber_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER)
-        toe_plot = CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE)
+        travel_values = (
+            np.linspace(config['TRAVEL']['MIN'], config['TRAVEL']['MAX'], config['SIM_STEPS'], True)
+            if config['TRAVEL']['ENABLE'] else [config['TRAVEL']['VALUE']]
+        )
 
-        sh_len = np.linspace(config['SIM_CONFIG']['MIN'], config['SIM_CONFIG']['MAX'], config['SIM_CONFIG']['STEP'], True)
-        for x in sh_len:
-            step = solver.solve(travel_mm=x)
+        for travel in travel_values:
+            step = solver.solve(travel_mm=travel)
             if step:
                 # 3d
                 plots[-1].update(step)

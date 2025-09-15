@@ -1,13 +1,21 @@
 HARDPOINTS: '2026'
 TYPE:       'front'
+SIM_STEPS:  200     # Number of steps for sweeping sim
+
+TRAVEL:
+  ENABLE:   True    # True to use MIN/MAX. False to use VALUE.
+  VALUE:    0       # [mm] A value to fix the TRAVEL to during sim
+  MIN:      -50     # [mm] Min range to sweep TRAVEL through during sim 
+  MAX:      125     # [mm] Max for range to sweep TRAVEL through during sim
+
+STEER: 
+  ENABLE:   False   # True to use MIN/MAX. False to use VALUE.
+  VALUE:    0       # [mm] A value to fix the STEER to during sim
+  MIN:      0       # [mm] Min for range to sweep STEER through during sim
+  MAX:      32.5    # [mm] Max for range to sweep STEER through during sim
 
 PLOTS:
   CAMBER:   True
   TOE:      True
   CASTER:   True
   3D:       True
-
-SIM_CONFIG:
-  MIN:      -200
-  MAX:      200
-  STEP:     400
