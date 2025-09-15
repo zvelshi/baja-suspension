@@ -1,4 +1,4 @@
-# 2026 rev 1 softpoints - 2025-08-18
+# 2026 hardpoints - 2025-09-13
 
 baja_2026:
   shock_min: 327.025
@@ -10,10 +10,10 @@ baja_2026:
     _type: 'DoubleAArm'
 
     # inboard a arm points
-    upper_a_arm_front:  [0.000,   220.000, 577.451]
-    upper_a_arm_rear:   [377.979, 220.000, 488.414]
-    lower_a_arm_front:  [128.472, 190.000, 405.966]
-    lower_a_arm_rear:   [430.861, 190.000, 335.364]
+    upper_a_arm_front: [0.000,   220.000, 577.451]
+    upper_a_arm_rear:  [377.979, 220.000, 488.414]
+    lower_a_arm_front: [128.472, 190.000, 405.966]
+    lower_a_arm_rear:  [430.861, 190.000, 335.364]
 
     # upright joints
     upper_ball_joint: [280.500, 623.594, 380.887]
@@ -29,28 +29,29 @@ baja_2026:
     shock_outboard: [317.219, 469.210, 308.406]
 
     # wheel points
-    wheel_center:   [275.000, 695.000, 305.066]
-    wheel_spindle:  [275.000, 579.302, 300.377]
+    wheel_center:  [275.000, 695.000, 305.066]
+    wheel_spindle: [275.000, 579.302, 300.377]
 
   rear:
     _type: 'SemiTrailingLink'
 
     # trailing link point
-    trailing_link_front:  
+    trailing_link_front: [1230.00, 275.773, 409.857]
 
     # camber link points
-    upper_camber_link_inboard:  
-    upper_camber_link_outboard: 
-    lower_camber_link_inboard:  
-    lower_camber_link_outboard: 
+    upper_camber_link_inboard:  [1877.00,  60.000,  439.981]
+    upper_camber_link_outboard: [1788.087, 535.300, 344.246]
+    lower_camber_link_inboard:  [1877.000, 60.000,  389.981]
+    lower_camber_link_outboard: [1767.653, 535.300, 246.445]
 
     # shock points
-    shock_inboard:  
-    shock_outboard: 
+    shock_location: "lower"
+    shock_inboard:  [1696.652, 254.060, 756.518]
+    shock_outboard: [1740.944, 499.091, 377.695]
 
     # axle pivot points
-    pivot_inboard: 
-    pivot_outboard: 
+    pivot_inboard:  [1764.000, 105.000, 431.681]
+    pivot_outboard: [1730.000, 467.300, 305.304]
 
     # wheel points
-    wheel_center: 
+    wheel_center: [1730.000, 620.000, 305.304]
