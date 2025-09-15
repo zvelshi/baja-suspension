@@ -26,22 +26,21 @@ You will only need to do the set up steps once. After that, to run it, you can:
 4. Then do the following from the 'To Run' section (you can mix and match different parameters as needed, or try the examples below)
 
 ### To run:
-```
-python main.py --hardpoints <year> --sim_type <type>
-```
+1. Set the simulation configuration in `sim_config.yml`
 
-**Parameters:**
-- `--hardpoints`: Vehicle hardpoints yaml located under `/hardpoints` -> [`2021`, `2024`, or `2026`]
-- `--sim_type`: Analysis type [`front`, `rear`, or `vehicle`]
+- For example, to run a simulation of the **front suspension** with **2026 hardpoints**, set the following in `sim_config.yml`
+    ```yml
+    HARDPOINTS: '2026'
+    TYPE:       'front'
 
-**Examples:**
+    PLOTS:
+    CAMBER:   True
+    TOE:      True
+    CASTER:   True
+    3D:       True
+    ```
 
-Analyze front double A-arm suspension with 2026 hardpoints file
-```
-python main.py --hardpoints 2026 --sim_type front
-```
-
-Analyze rear semi-trailing link suspension with 2024 hardpoints file
-```
-python main.py --hardpoints 2024 --sim_type rear
-```
+2. Run the main script
+    ```python
+    python main.py
+    ``` 
