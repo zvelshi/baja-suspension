@@ -11,8 +11,8 @@ TRAVEL:
 STEER: 
   ENABLE:   False   # True to use MIN/MAX. False to use VALUE.
   VALUE:    0       # [mm] A value to fix the STEER to during sim
-  MIN:      0       # [mm] Min for range to sweep STEER through during sim
-  MAX:      32.5    # [mm] Max for range to sweep STEER through during sim
+  MIN:      -40     # [mm] Min for range to sweep STEER through during sim
+  MAX:      40      # [mm] Max for range to sweep STEER through during sim
 
 PLOTS:
   CAMBER:   True
