@@ -1,7 +1,7 @@
 HARDPOINTS: '2026'
 TYPE:       'front'
 
-GRAPHS:
+PLOTS:
   CAMBER:   True
   TOE:      True
   CASTER:   True
