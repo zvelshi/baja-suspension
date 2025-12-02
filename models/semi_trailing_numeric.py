@@ -20,10 +20,8 @@ class SemiTrailingLinkNumeric:
         self._wc_z0   = hp.wc[2]
         self._shock_0 = self.len["shock_static"]
 
-        # ----------------- Axle setup -----------------
-
-        axle_length = self.len["axle_ib_ob_static"]  # piv_ib <-> piv_ob
-        axle_ob_wc  = self.len["axle_ob_wc"]         # piv_ob <-> wc
+        axle_length = self.len["axle_ib_ob_static"] # piv_ib <-> piv_ob
+        axle_ob_wc  = self.len["axle_ob_wc"] # piv_ob <-> wc
 
         # Choose inboard direction along +/- Y so "inboard" is towards y = 0
         y_ib = hp.piv_ib[1]
@@ -40,14 +38,14 @@ class SemiTrailingLinkNumeric:
         # Plunging CV at the inboard end (joint 1)
         joint1 = PlungingCVJoint(
             ext_length=np.linalg.norm(self._joint1_ext_offset), # ≈ 20 mm
-            max_angle=None,
+            max_angle=np.deg2rad(30), #[rad]
             plunge_axis="y",
         )
 
         # Regular CV at the outboard end (joint 2)
         joint2 = CVJoint(
             ext_length=axle_ob_wc,
-            max_angle=None,
+            max_angle=np.deg2rad(30), #[rad]
         )
 
         self.axle = Axle(
@@ -148,10 +146,10 @@ class SemiTrailingLinkNumeric:
             )
 
             length_err = axle_res["length"]
-            j1_err     = axle_res["joint1"]
-            j2_err     = axle_res["joint2"]
+            j1_err = axle_res["joint1"]
+            j2_err = axle_res["joint2"]
 
-            r = np.empty(6)
+            r = np.empty(8)
 
             # 1 - Upper trailing link length
             r[0] = np.linalg.norm(hp.tl_f - ucl_ob_w) - self.len["upper_trailing_link"]
@@ -165,14 +163,16 @@ class SemiTrailingLinkNumeric:
             # 4 - Lower camber link length
             r[3] = np.linalg.norm(lcl_ob_w - hp.lcl_ib) - self.len["lower_camber_link"]
 
-            # 5 - Axle constraint
-            r[4] = length_err + j1_err + j2_err
+            # 5 - 7 - Axle constraint
+            r[4] = length_err
+            r[5] = j1_err
+            r[6] = j2_err
 
-            # 6 - User constraint (shock length OR wheel-centre bump height)
+            # 8 - User constraint (shock length OR wheel-centre bump height)
             if targ_shock is not None:
-                r[5] = np.linalg.norm(hp.s_ib - s_ob_w) - targ_shock
+                r[7] = np.linalg.norm(hp.s_ib - s_ob_w) - targ_shock
             else:
-                r[5] = p[2] - targ_wcz
+                r[7] = p[2] - targ_wcz
 
             return r
 

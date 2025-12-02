@@ -92,8 +92,7 @@ class PlungingCVJoint(Joint):
 
     plunge_axis:
         Axis along which the extremity is allowed to move relative
-        to the joint centre ('x', 'y', or 'z'). Motion perpendicular
-        to this axis is penalised.
+        to the joint centre ('x', 'y', or 'z').
     """
     plunge_axis: Literal["x", "y", "z"] = "x"
 

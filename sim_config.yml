@@ -1,5 +1,5 @@
-HARDPOINTS: '2024'
-SIM_STEPS:  350     # Number of steps for sweeping sim
+HARDPOINTS: '2026'
+SIM_STEPS:  310     # Number of steps for sweeping sim
 LIVE_UPDATE: True   # Update the plots as sim steps are solved
 SIMULATION: 'wheel_attitude'  # 'wheel_attitude', 'jacking'
 
@@ -9,8 +9,8 @@ SIDE: 'right'       # 'left' or 'right'
 TRAVEL:
   ENABLE:   True    # True to use MIN/MAX. False to use VALUE.
   VALUE:    0       # [mm] A value to fix the TRAVEL to during sim
-  MIN:      -50     # [mm] Min range to sweep TRAVEL through during sim 
-  MAX:      125     # [mm] Max for range to sweep TRAVEL through during sim
+  MIN:      -90     # [mm] Min range to sweep TRAVEL through during sim 
+  MAX:      240     # [mm] Max for range to sweep TRAVEL through during sim
 
 STEER: 
   ENABLE:   False   # True to use MIN/MAX. False to use VALUE.

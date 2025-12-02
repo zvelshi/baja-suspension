@@ -32,7 +32,7 @@ class WheelAttitudeSimulation(Simulation):
                 if self.config['STEER']['ENABLE'] else [self.config['STEER']['VALUE']] * self.config['SIM_STEPS']
             )
             for travel, steer in zip(travel_values, steer_values):
-                step = solver.solve(bump_z=travel, steer_mm=steer)
+                step = solver.solve(travel_mm=travel, steer_mm=steer)
                 if step:
                     steps.append(step)
         else:
