@@ -50,7 +50,7 @@ baja_2026:
     shock_outboard: [1740.944, 499.091, 377.695]
 
     # axle pivot points
-    pivot_inboard:  [1764.000, 105.000, 431.681]
+    pivot_inboard:  [1730.000, 54.408, 431.681]
     pivot_outboard: [1730.000, 467.300, 305.304]
 
     # wheel points
