@@ -10,6 +10,76 @@ from mpl_toolkits.mplot3d import Axes3D
 # ours
 from scripts.hardpoints import DoubleAArm, SemiTrailingLink
 
+def _compute_wheel_cylinder(
+    wc: np.ndarray,
+    step: Dict[str, np.ndarray],
+    radius: float,
+    width: float,
+    n_theta: int = 40,
+):
+    """
+    Compute two circles (front/back) that form a cylinder outline for the wheel.
+
+    wc      : wheel centre (3,)
+    step    : kinematic step dict (contains W_* rim points and optionally 'wheel_axis')
+    radius  : wheel radius (wr)
+    width   : wheel width (ww)
+    n_theta : number of points around the circle
+    """
+    wc = np.asarray(wc, dtype=float)
+
+    # 1) Prefer the true wheel axis if provided by the solver
+    axis = None
+    if "wheel_axis" in step:
+        a = np.asarray(step["wheel_axis"], dtype=float)
+        n = np.linalg.norm(a)
+        if n > 1e-9:
+            axis = a / n
+
+    # 2) Fallback: infer axis from rim points (choose pair with max cross product)
+    if axis is None:
+        rim_keys = [k for k in step.keys() if k.startswith("W_")]
+        rim_vecs = [np.asarray(step[k], float) - wc for k in rim_keys]
+
+        if len(rim_vecs) >= 2:
+            best_cross = 0.0
+            best_pair = None
+            for i in range(len(rim_vecs)):
+                for j in range(i + 1, len(rim_vecs)):
+                    c = np.cross(rim_vecs[i], rim_vecs[j])
+                    n = np.linalg.norm(c)
+                    if n > best_cross:
+                        best_cross = n
+                        best_pair = c
+            if best_pair is not None and best_cross > 1e-9:
+                axis = best_pair / best_cross
+
+    # 3) If all else fails, just assume global Y as axis
+    if axis is None:
+        axis = np.array([0.0, 1.0, 0.0])
+
+    # Build an orthonormal basis (u, v, axis)
+    tmp = np.array([1.0, 0.0, 0.0])
+    if abs(np.dot(tmp, axis)) > 0.9:
+        tmp = np.array([0.0, 0.0, 1.0])
+
+    u = tmp - np.dot(tmp, axis) * axis
+    u /= np.linalg.norm(u)
+    v = np.cross(axis, u)
+
+    # Centres of front/back rims along the axis
+    c_front = wc - 0.5 * width * axis
+    c_back  = wc + 0.5 * width * axis
+
+    theta = np.linspace(0.0, 2.0 * np.pi, n_theta)
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    circle_front = c_front[:, None] + radius * (u[:, None] * cos_t + v[:, None] * sin_t)
+    circle_back  = c_back[:, None]  + radius * (u[:, None] * cos_t + v[:, None] * sin_t)
+
+    return circle_front, circle_back
+
 class SCALAR_CHARACTERISTIC(Enum):
     CAMBER = auto()
     CASTER = auto()
@@ -108,8 +178,9 @@ class DoubleAArmPlotter(PlotterBase):
         # path line for wheel center
         self.path_line, = self.ax.plot([], [], [], c="red", lw=1.5)
 
-        # dynamic points for the wheel rim
-        self.wheel_scatter = self.ax.scatter([], [], [], c="tab:blue", s=15, label="wheel-rim pts")
+        # wheel cylinder outline (two circles: front/back)
+        self.wheel_cyl_front = self.ax.plot([], [], [], c="0.5", lw=1.5)[0]
+        self.wheel_cyl_back  = self.ax.plot([], [], [], c="0.5", lw=1.5)[0]
 
         plt.ion()
         plt.show(block=False)
@@ -126,13 +197,28 @@ class DoubleAArmPlotter(PlotterBase):
         pts = np.vstack([lbj, ubj, wc, sha])
         self.mov_scatter._offsets3d = (pts[:, 0], pts[:, 1], pts[:, 2])
 
-        # wheel rim points
-        wheel_pts = [v for k, v in step.items() if k.startswith("W_")]
-        if wheel_pts:                       # solver found rim points
-            wp = np.vstack(wheel_pts)
-            self.wheel_scatter._offsets3d = (wp[:, 0], wp[:, 1], wp[:, 2])
-        else:                               # outside travel range, etc.
-            self.wheel_scatter._offsets3d = ([], [], [])
+        # wheel cylinder outline (uses wr, ww, wc and rim points)
+        try:
+            circle_front, circle_back = _compute_wheel_cylinder(
+                wc=wc,
+                step=step,
+                radius=hp.wr,
+                width=hp.ww,
+            )
+
+            # front circle
+            self.wheel_cyl_front.set_data(circle_front[0, :], circle_front[1, :])
+            self.wheel_cyl_front.set_3d_properties(circle_front[2, :])
+
+            # back circle
+            self.wheel_cyl_back.set_data(circle_back[0, :], circle_back[1, :])
+            self.wheel_cyl_back.set_3d_properties(circle_back[2, :])
+        except Exception:
+            # If anything goes wrong (no points / numerical issues), clear the cylinder
+            self.wheel_cyl_front.set_data([], [])
+            self.wheel_cyl_front.set_3d_properties([])
+            self.wheel_cyl_back.set_data([], [])
+            self.wheel_cyl_back.set_3d_properties([])
 
         # upper front‑rear
         for line, chassis in zip(self.upper_lines, (hp.uf, hp.ur)):
@@ -163,7 +249,7 @@ class DoubleAArmPlotter(PlotterBase):
 
 class SemiTrailingLinkPlotter(PlotterBase):
     def __init__(self, hp: SemiTrailingLink):
-        self.hp   = hp
+        self.hp = hp
         self._path: list[np.ndarray] = []
 
         self.fig, self.ax = self._make_axes(
@@ -183,16 +269,20 @@ class SemiTrailingLinkPlotter(PlotterBase):
 
         # uniform cube axes
         self.ax.set_xlim(1000, 2000)
-        self.ax.set_ylim(   0, 1000)
-        self.ax.set_zlim(   0, 1000)
+        self.ax.set_ylim(0, 1000)
+        self.ax.set_zlim(0, 1000)
         self.ax.set_box_aspect([1, 1, 1])
 
-        # chassis hard-points
+        # chassis hard-points (fixed in the vehicle frame)
         for pt in (hp.tl_f, hp.ucl_ib, hp.lcl_ib, hp.s_ib):
             self.ax.scatter(*pt, c="black", s=25)
 
-        # dynamic point scatter
+        # dynamic point scatter for the upright / wheel
         self.mov_scatter = self.ax.scatter([], [], [], c="black", s=25)
+
+        # outboard and inboard axle joint – dynamic, shown in red
+        self.piv_ob_scatter = self.ax.scatter([], [], [], c="red", s=35, label="axle outboard")
+        self.piv_ib_scatter = self.ax.scatter([], [], [], c="red", s=35, label="axle inboard")
 
         # link lines
         self.utl_line = self.ax.plot([], [], [], c="black", lw=1.5)[0]
@@ -201,39 +291,60 @@ class SemiTrailingLinkPlotter(PlotterBase):
         self.lcl_line = self.ax.plot([], [], [], c="black", lw=1.5)[0]
         self.shock_line = self.ax.plot([], [], [], c="black", lw=1.5)[0]
 
-        # wheel-centre path
-        self.path_line, = self.ax.plot([], [], [], c="red", lw=1.5)
+        # axle polyline (wc -> pivot outboard -> pivot inboard)
+        self.axle_line = self.ax.plot([], [], [], c="red", lw=1.5)[0]
 
-        # dynamic points for the wheel rim
-        self.wheel_scatter = self.ax.scatter([], [], [], c="tab:blue", s=15, label="wheel-rim pts")
+        # wheel-centre path
+        self.path_line, = self.ax.plot([], [], [], c="tab:orange", lw=1.5)
+
+        # wheel cylinder outline (front/back circles)
+        self.wheel_cyl_front = self.ax.plot([], [], [], c="0.5", lw=1.5)[0]
+        self.wheel_cyl_back  = self.ax.plot([], [], [], c="0.5", lw=1.5)[0]
 
     def update(self, step: Dict[str, np.ndarray]):
         wc = step["wc"]
         piv_ob = step["piv_ob"]
+        piv_ib = step["piv_ib"]
         s_ob = step["s_ob"]
         ucl_ob = step["ucl_ob"]
         lcl_ob = step["lcl_ob"]
 
-        # movable scatter points
+        # movable scatter points (upright / wheel)
         pts = np.vstack([wc, s_ob, ucl_ob, lcl_ob])
         self.mov_scatter._offsets3d = (pts[:, 0], pts[:, 1], pts[:, 2])
 
-        # wheel rim points
-        wheel_pts = [v for k, v in step.items() if k.startswith("W_")]
-        if wheel_pts: # solver found rim points
-            wp = np.vstack(wheel_pts)
-            self.wheel_scatter._offsets3d = (wp[:, 0], wp[:, 1], wp[:, 2])
-        else: # outside travel range, etc.
-            self.wheel_scatter._offsets3d = ([], [], [])
+        # outboard and inboard axle point in red
+        self.piv_ob_scatter._offsets3d = ([piv_ob[0]], [piv_ob[1]], [piv_ob[2]])
+        self.piv_ib_scatter._offsets3d = ([piv_ib[0]], [piv_ib[1]], [piv_ib[2]])
+
+        # wheel cylinder outline
+        try:
+            circle_front, circle_back = _compute_wheel_cylinder(
+                wc=wc,
+                step=step,
+                radius=self.hp.wr,
+                width=self.hp.ww,
+            )
+
+            self.wheel_cyl_front.set_data(circle_front[0, :], circle_front[1, :])
+            self.wheel_cyl_front.set_3d_properties(circle_front[2, :])
+
+            self.wheel_cyl_back.set_data(circle_back[0, :], circle_back[1, :])
+            self.wheel_cyl_back.set_3d_properties(circle_back[2, :])
+        except Exception:
+            self.wheel_cyl_front.set_data([], [])
+            self.wheel_cyl_front.set_3d_properties([])
+            self.wheel_cyl_back.set_data([], [])
+            self.wheel_cyl_back.set_3d_properties([])
 
         # upper trailing link
         self.utl_line.set_data([step["tl_f"][0], ucl_ob[0]],
-                              [step["tl_f"][1], ucl_ob[1]])
+                               [step["tl_f"][1], ucl_ob[1]])
         self.utl_line.set_3d_properties([step["tl_f"][2], ucl_ob[2]])
 
         # lower trailing link
         self.ltl_line.set_data([step["tl_f"][0], lcl_ob[0]],
-                              [step["tl_f"][1], lcl_ob[1]])
+                               [step["tl_f"][1], lcl_ob[1]])
         self.ltl_line.set_3d_properties([step["tl_f"][2], lcl_ob[2]])
 
         # upper camber link
@@ -250,6 +361,11 @@ class SemiTrailingLinkPlotter(PlotterBase):
         self.shock_line.set_data([step["s_ib"][0], s_ob[0]],
                                  [step["s_ib"][1], s_ob[1]])
         self.shock_line.set_3d_properties([step["s_ib"][2], s_ob[2]])
+
+        # axle polyline
+        axle_pts = np.vstack([wc, piv_ob, piv_ib])
+        self.axle_line.set_data(axle_pts[:, 0], axle_pts[:, 1])
+        self.axle_line.set_3d_properties(axle_pts[:, 2])
 
         # wheel-centre path
         self._path.append(wc.copy())
