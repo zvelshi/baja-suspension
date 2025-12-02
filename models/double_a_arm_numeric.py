@@ -7,13 +7,11 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation as R
 
-# ours
-from scripts.hardpoints import DoubleAArm
-
 class DoubleAArmNumeric:
-    def __init__(self, hp: DoubleAArm):
+    def __init__(self, hp):
         self.hp = hp
-        self.len = DoubleAArm.link_lengths(hp)
+        self.len = type(hp).link_lengths(hp)
+
         self._x_prev = np.hstack([hp.lbj, np.zeros(3)]) # seed guess
         self._wc0 = hp.wc[2]
         self._shock0 = self.len["shock_static"]
@@ -154,6 +152,7 @@ class DoubleAArmNumeric:
             "s_ob": sha,
             "tr_ib": tr_ib_offset,
             "tr_ob": tr_ob,
+            "wheel_axis": Rw[:, 1],  # for plotting
         }
         
         # get wheel points

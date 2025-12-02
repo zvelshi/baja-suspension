@@ -8,56 +8,62 @@ from typing import Dict, Tuple
 # third-party
 import numpy as np
 
+# ours
+from models.double_a_arm_numeric import DoubleAArmNumeric
+from models.semi_trailing_numeric import SemiTrailingLinkNumeric
+
 class Vehicle:
-    nickname: str       # vehicle nickname
+    nickname: str
 
-    shock_min: float    # compressed length of shock
-    shock_max: float    # extended length of shock
-
-    wheel_radius: float # tire radius
-    wheel_width: float  # tire width
-
-    front_type: str
-    front_hp: Hardpoints
-
-    rear_type: str
-    rear_hp: Hardpoints
-
-    def __init__(self, yml_path):
-        with open(yml_path, 'r') as file:
-            data = yaml.safe_load(file)
-
+    def __init__(self, data: Dict = {}):
         self.nickname = list(data.keys())[0]
-        vehicle = data[self.nickname]
+        vehicle_data = data[self.nickname]
 
-        self.shock_min = vehicle['shock_min']
-        self.shock_max = vehicle['shock_max']
+        # (left/right, front/rear)
+        self.front_left  = Corner(vehicle_data, (0, 0))
+        self.front_right = Corner(vehicle_data, (1, 0))
+        self.rear_left   = Corner(vehicle_data, (0, 1))
+        self.rear_right  = Corner(vehicle_data, (1, 1))
 
-        self.wheel_radius = vehicle['wheel_radius']
-        self.wheel_width  = vehicle['wheel_width']
+    def run_simulation(self, simulation_class, **kwargs):
+        simulation = simulation_class(self, kwargs.get("config", {}))
+        return simulation.run(**kwargs)   # fix: return steps so caller can use them
 
-        if 'front' in vehicle:
-            self.front_type = vehicle['front']['_type']
-            if self.front_type == 'DoubleAArm':
-                self.front_hp = DoubleAArm.from_data(data=vehicle['front'])
-                self.front_hp._fill_vehicle_properties(data=vehicle)
+class Corner:
+    """
+         (0, 0) _________ (1, 0)
+                |       |
+                |       |
+                |       |
+                |       |
+                |       |
+         (0, 1) |_______| (1, 1)
+    """
+    def __init__(self, data: Dict, pos: Tuple[int, int]):
+        self.pos = pos  # (left/right, front/rear)
 
-        if 'rear' in vehicle:
-            self.rear_type  = vehicle['rear']['_type']
-            if self.rear_type == 'SemiTrailingLink':
-                self.rear_hp = SemiTrailingLink.from_data(data=vehicle['rear'])
-                self.rear_hp._fill_vehicle_properties(data=vehicle)
+        if self.pos[1] == 0:
+            hp = DoubleAArm.from_data(data=data['front'])
+        else:
+            hp = SemiTrailingLink.from_data(data=data['rear'])
+
+        if self.pos[0] == 0:  # left side -> mirror across y-axis
+            hp = type(hp).mirror_points(hp)
+
+        hp._fill_vehicle_properties(data=data)
+
+        self.hardpoints = hp
+        self.solver = DoubleAArmNumeric(hp) if isinstance(hp, DoubleAArm) else SemiTrailingLinkNumeric(hp)
 
 @dataclass
 class Hardpoints:
-
     # shock properties
-    shock_min: float = field(default=0.0, init=False)   # shock min
-    shock_max: float = field(default=0.0, init=False)   # shock max
+    shock_min: float = field(default=0.0, init=False)
+    shock_max: float = field(default=0.0, init=False)
 
     # wheel properties
-    wr: float        = field(default=0.0, init=False)   # wheel radius
-    ww: float        = field(default=0.0, init=False)   # wheel width
+    wr: float        = field(default=0.0, init=False)
+    ww: float        = field(default=0.0, init=False)
 
     def _fill_vehicle_properties(self, data):
         self.shock_min = data['shock_min']
@@ -66,12 +72,23 @@ class Hardpoints:
         self.ww = data['wheel_width']
 
     @classmethod
-    def from_data(self, *args, **kwargs):
+    def from_data(cls, data: dict) -> Hardpoints:
         raise NotImplementedError
     
     @classmethod
-    def link_lengths(self, *args, **kwargs):
+    def link_lengths(cls, hp: Hardpoints) -> Dict[str, float]:
         raise NotImplementedError
+    
+    @classmethod
+    def mirror_points(cls, hp: Hardpoints) -> Hardpoints:
+        """Return a new Hardpoints instance with left/right points mirrored about the xz plane."""
+        mirrored_data = {}
+        for attr, value in hp.__dict__.items():
+            if isinstance(value, np.ndarray) and value.shape == (3,):
+                mirrored_data[attr] = np.array([value[0], -value[1], value[2]])
+            else:
+                mirrored_data[attr] = value
+        return cls(**mirrored_data)
 
 @dataclass
 class DoubleAArm(Hardpoints):
@@ -99,7 +116,7 @@ class DoubleAArm(Hardpoints):
     wc: np.ndarray          # wheel center point
 
     @classmethod
-    def from_data(self, data: dict) -> "DoubleAArm":
+    def from_data(cls, data: dict) -> "DoubleAArm":
         return DoubleAArm(
             uf   =np.array(data['upper_a_arm_front']),
             ur   =np.array(data['upper_a_arm_rear']),
@@ -114,16 +131,16 @@ class DoubleAArm(Hardpoints):
             s_ob =np.array(data['shock_outboard']),
             wc   =np.array(data['wheel_center']),
         )
-    
+
     @classmethod
-    def link_lengths(self, hp: "DoubleAArm") -> Dict[str, float]:
+    def link_lengths(cls, hp: "DoubleAArm") -> Dict[str, float]:
         return {
-            "upper_front": np.linalg.norm(hp.ubj - hp.uf),
-            "upper_rear": np.linalg.norm(hp.ubj - hp.ur),
-            "lower_front": np.linalg.norm(hp.lbj - hp.lf),
-            "lower_rear": np.linalg.norm(hp.lbj - hp.lr),
-            "tie_rod": np.linalg.norm(hp.tr_ib - hp.tr_ob),
-            "shock_static": np.linalg.norm(hp.s_ib - hp.s_ob),
+            "upper_front": float(np.linalg.norm(hp.ubj - hp.uf)),
+            "upper_rear": float(np.linalg.norm(hp.ubj - hp.ur)),
+            "lower_front": float(np.linalg.norm(hp.lbj - hp.lf)),
+            "lower_rear": float(np.linalg.norm(hp.lbj - hp.lr)),
+            "tie_rod": float(np.linalg.norm(hp.tr_ib - hp.tr_ob)),
+            "shock_static": float(np.linalg.norm(hp.s_ib - hp.s_ob)),
         }
 
 @dataclass
@@ -150,8 +167,8 @@ class SemiTrailingLink(Hardpoints):
     wc: np.ndarray           # wheel center point
 
     @classmethod
-    def from_data(self, data: dict) -> "SemiTrailingLink":
-        return SemiTrailingLink(
+    def from_data(cls, data: dict) -> "SemiTrailingLink":
+        return cls(
             tl_f  =np.array(data['trailing_link_front']),
             ucl_ib=np.array(data['upper_camber_link_inboard']),
             ucl_ob=np.array(data['upper_camber_link_outboard']),
@@ -165,13 +182,13 @@ class SemiTrailingLink(Hardpoints):
         )
 
     @classmethod
-    def link_lengths(self, hp: "SemiTrailingLink") -> Dict[str, float]:
+    def link_lengths(cls, hp: "SemiTrailingLink") -> Dict[str, float]:
         return {
-            "upper_trailing_link":  np.linalg.norm(hp.tl_f - hp.ucl_ob),
-            "lower_trailing_link":  np.linalg.norm(hp.tl_f - hp.lcl_ob),
-            "upper_camber_link":    np.linalg.norm(hp.ucl_ib - hp.ucl_ob),
-            "lower_camber_link":    np.linalg.norm(hp.lcl_ib - hp.lcl_ob),
-            "shock_static":         np.linalg.norm(hp.s_ib - hp.s_ob),
-            "axle_ib_ob_static":    np.linalg.norm(hp.piv_ib - hp.piv_ob),
-            "axle_ob_wc":           np.linalg.norm(hp.piv_ob - hp.wc),
+            "upper_trailing_link":  float(np.linalg.norm(hp.tl_f - hp.ucl_ob)),
+            "lower_trailing_link":  float(np.linalg.norm(hp.tl_f - hp.lcl_ob)),
+            "upper_camber_link":    float(np.linalg.norm(hp.ucl_ib - hp.ucl_ob)),
+            "lower_camber_link":    float(np.linalg.norm(hp.lcl_ib - hp.lcl_ob)),
+            "shock_static":         float(np.linalg.norm(hp.s_ib - hp.s_ob)),
+            "axle_ib_ob_static":    float(np.linalg.norm(hp.piv_ib - hp.piv_ob)),
+            "axle_ob_wc":           float(np.linalg.norm(hp.piv_ob - hp.wc)),
         }

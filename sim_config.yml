@@ -1,6 +1,10 @@
-HARDPOINTS: '2026'
-TYPE:       'front'
-SIM_STEPS:  200     # Number of steps for sweeping sim
+HARDPOINTS: '2024'
+SIM_STEPS:  350     # Number of steps for sweeping sim
+LIVE_UPDATE: True   # Update the plots as sim steps are solved
+SIMULATION: 'wheel_attitude'  # 'wheel_attitude', 'jacking'
+
+HALF: 'rear'        # 'front' or 'rear'
+SIDE: 'right'       # 'left' or 'right'
 
 TRAVEL:
   ENABLE:   True    # True to use MIN/MAX. False to use VALUE.
