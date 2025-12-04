@@ -461,13 +461,6 @@ class AxleCharacteristicsPlotter(PlotterBase):
 
         self._xs, self._ys = [], []
         self._line, = self.ax.plot([], [], "-o", lw=1.5)
-        
-        # Add reference lines for safety limits if applicable
-        if char == AXLE_CHARACTERISTIC.PLUNGE:
-            self.ax.axhline(25, color='r', linestyle='--', alpha=0.5)
-            self.ax.axhline(-25, color='r', linestyle='--', alpha=0.5)
-        elif char in (AXLE_CHARACTERISTIC.ANGLE_IB, AXLE_CHARACTERISTIC.ANGLE_OB):
-            self.ax.axhline(30, color='r', linestyle='--', alpha=0.5)
 
     def update(self, step: Dict[str, np.ndarray]):
         """

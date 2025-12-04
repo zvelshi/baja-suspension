@@ -3,7 +3,7 @@ SIM_STEPS:  330     # Number of steps for sweeping sim
 LIVE_UPDATE: True   # Update the plots as sim steps are solved
 SIMULATION: 'wheel_attitude'  # 'wheel_attitude', 'jacking'
 
-HALF: 'front'        # 'front' or 'rear'
+HALF: 'rear'        # 'front' or 'rear'
 SIDE: 'right'       # 'left' or 'right'
 
 TRAVEL:

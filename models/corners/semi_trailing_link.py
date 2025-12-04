@@ -72,27 +72,11 @@ class SemiTrailingLinkNumeric:
             ucl_ob_w = p + Rw @ ucl_vec
             lcl_ob_w = p + Rw @ lcl_vec
             s_ob_w   = p + Rw @ s_ob_vec
-            piv_ob_w = p + Rw @ axle_ob_vec
             
             # Front trailing pivot (rigidly attached to upright)
             tl_f_current = p + Rw @ self._tl_f_local
 
-            # Axle constraints
-            n_ib_dir = -1.0 if hp.piv_ib[1] > 0 else 1.0 
-            n_ib = np.array([0.0, n_ib_dir, 0.0])
-
-            # Outboard points
-            n_ob_dir = 1.0 if hp.wc[1] > 0 else -1.0
-            n_ob = Rw @ np.array([0.0, n_ob_dir, 0.0])
-
-            axle_res = self.axle.constraints(
-                p_inboard=hp.piv_ib, 
-                p_outboard=piv_ob_w, 
-                n_inboard=n_ib, 
-                n_outboard=n_ob
-            )
-
-            r = np.empty(9)
+            r = np.empty(6)
 
             # [0, 1, 2] Trailing link Front Pivot 
             delta_pivot = tl_f_current - hp.tl_f
@@ -106,17 +90,11 @@ class SemiTrailingLinkNumeric:
             # [4] Lower Camber Link
             r[4] = np.linalg.norm(lcl_ob_w - hp.lcl_ib) - self.len["lower_camber_link"]
 
-            # [5, 6, 7] Axle Constraints
-            idx = 5
-            for res_val in axle_res:
-                r[idx] = res_val
-                idx += 1
-
-            # [8] Travel Constraint
+            # [5] Travel Constraint
             if targ_shock is not None:
-                r[8] = np.linalg.norm(hp.s_ib - s_ob_w) - targ_shock
+                r[5] = np.linalg.norm(hp.s_ib - s_ob_w) - targ_shock
             else:
-                r[8] = p[2] - targ_wcz
+                r[5] = p[2] - targ_wcz
 
             return r
 
@@ -142,7 +120,7 @@ class SemiTrailingLinkNumeric:
         tl_f_current = p + Rw @ self._tl_f_local
 
         # Axle state calculation
-        n_ib_dir = 1.0 if hp.piv_ib[1] > 0 else -1.0 
+        n_ib_dir = 1.0 if hp.piv_ib[1] > 0 else -1.0
         n_ib = np.array([0.0, n_ib_dir, 0.0])
         n_ob_dir = -1.0 if hp.wc[1] > 0 else 1.0
         n_ob = Rw @ np.array([0.0, n_ob_dir, 0.0])
