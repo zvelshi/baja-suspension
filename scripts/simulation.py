@@ -5,7 +5,7 @@ from typing import Dict
 import numpy as np
 
 # ours
-from scripts.hardpoints import Vehicle, Corner
+from models.hardpoints import Vehicle, Corner
 
 class Simulation:
     def __init__(self, vehicle: Vehicle, sim_config: Dict):

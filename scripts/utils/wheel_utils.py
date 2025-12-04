@@ -4,27 +4,44 @@ from typing import Dict
 # third-party
 import numpy as np
 
-# ours
-
 def wheel_attitude(step: Dict[str, np.ndarray]) -> Dict[str, float]:
-    """Return camber, toe and caster angles [deg] from one kinematic step."""
+    """
+    Calculates Toe and Camber using the Wheel Axis vector directly.
+    """
 
-    # camber
-    dz = step["W_Zp"][2] - step["W_Zm"][2]          # ≈ 2·radius
-    dy = step["W_Zp"][1] - step["W_Zm"][1]          # lateral displacement caused by camber
-    camber = np.degrees(np.arctan2(dy, dz))         # −ve = top inwards (convention)
+    # Get the wheel's rotation axis (wheel y-axis)
+    n = step["wheel_axis"] 
+    
+    # Identify side
+    is_left = step["wc"][1] < 0
+    
+    # Camber - projection of wheel y onto global z
+    camber_rad = np.arcsin(n[2])
+    camber = np.rad2deg(camber_rad)
+    
+    # Sign correction: top-in is negative
+    if not is_left:
+        camber = -camber
 
-    # toe
-    dx    = step["W_Xp"][0] - step["W_Xm"][0]       # ≈ 2·radius
-    dy_xy = step["W_Xp"][1] - step["W_Xm"][1]       # lateral offset at the rim
-    toe = np.degrees(np.arctan2(dy_xy, dx))         # +ve = toe-in
+    # Toe - angle of the wheel heading in the XY plane    
+    # Project n onto XY plane
+    n_xy = np.array([n[0], n[1]])
+    n_xy /= np.linalg.norm(n_xy)
+    
+    # Angle relative to lateral axis (0, 1)
+    toe_rad = np.arctan2(n_xy[0], n_xy[1]) # deviation from Y
+    
+    # Sign Correction: toe-in is positive
+    toe = np.rad2deg(toe_rad)
+    if not is_left:
+        toe = -toe
 
-    # caster (front only)
+    # Caster (double a-arm only)
     if 'ubj' in step and 'lbj' in step:
         steer_axis = step["ubj"] - step["lbj"]
         caster = np.degrees(np.arctan2(-steer_axis[0], steer_axis[2]))  # +ve = rearward
     else:
-        caster = None
+        caster = 0.0    
 
     return {
         "camber": camber, 

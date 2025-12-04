@@ -1,9 +1,9 @@
 HARDPOINTS: '2026'
-SIM_STEPS:  310     # Number of steps for sweeping sim
+SIM_STEPS:  330     # Number of steps for sweeping sim
 LIVE_UPDATE: True   # Update the plots as sim steps are solved
 SIMULATION: 'wheel_attitude'  # 'wheel_attitude', 'jacking'
 
-HALF: 'rear'        # 'front' or 'rear'
+HALF: 'front'        # 'front' or 'rear'
 SIDE: 'right'       # 'left' or 'right'
 
 TRAVEL:
@@ -19,7 +19,9 @@ STEER:
   MAX:      40      # [mm] Max for range to sweep STEER through during sim
 
 PLOTS:
-  CAMBER:   True
-  TOE:      True
-  CASTER:   True
-  3D:       True
+  3D:           True
+  CAMBER:       True
+  TOE:          True
+  CASTER:       True
+  AXLE_PLUNGE:  True
+  AXLE_ANGLES:  True

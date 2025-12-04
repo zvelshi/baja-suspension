@@ -7,12 +7,14 @@ import yaml
 import numpy as np
 
 # ours
-from scripts.hardpoints import Vehicle, DoubleAArm, SemiTrailingLink
-from scripts.plotter import (
+from models.hardpoints import Vehicle, DoubleAArm, SemiTrailingLink
+from scripts.utils.plotter import (
     PlotterBase,
     DoubleAArmPlotter,
     SemiTrailingLinkPlotter,
     CharacteristicPlotter,
+    AxleCharacteristicsPlotter,
+    AXLE_CHARACTERISTIC,
     SCALAR_CHARACTERISTIC,
 )
 from scripts.simulation import (
@@ -64,7 +66,13 @@ if __name__ == "__main__":
     if config["PLOTS"]["TOE"]:
         plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE))
 
-    if config["PLOTS"]["3D"]:
+    if config["PLOTS"].get("AXLE_PLUNGE", False):
+        plots.append(AxleCharacteristicsPlotter(AXLE_CHARACTERISTIC.PLUNGE))
+    if config["PLOTS"].get("AXLE_ANGLES", False):
+        plots.append(AxleCharacteristicsPlotter(AXLE_CHARACTERISTIC.ANGLE_IB))
+        plots.append(AxleCharacteristicsPlotter(AXLE_CHARACTERISTIC.ANGLE_OB))
+
+    if config["PLOTS"].get("3D", False):
         hp = corner.hardpoints
         if half == 'front' and isinstance(hp, DoubleAArm):
             plots.append(DoubleAArmPlotter(hp))
@@ -75,12 +83,16 @@ if __name__ == "__main__":
     if steps:
         for st in steps:
             att = wheel_attitude(st)
-            for plot in plots[:-1] if config["PLOTS"]["3D"] else plots:
-                plot.update(att)
-
-        # Update 3D plot after all steps
+            
+            for plot in plots:
+                if isinstance(plot, CharacteristicPlotter):
+                    plot.update(att)
+                elif isinstance(plot, AxleCharacteristicsPlotter):
+                    plot.update(st)
+                
         if config["PLOTS"]["3D"] and plots:
-            plots[-1].update(steps[-1])
+            if isinstance(plots[-1], (DoubleAArmPlotter, SemiTrailingLinkPlotter)):
+                plots[-1].update(steps[-1])
 
     # Display all plots
     for plot in plots:
