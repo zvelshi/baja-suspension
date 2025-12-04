@@ -28,9 +28,12 @@ baja_2026:
     shock_inboard:  [396.356, 270.000, 722.145]
     shock_outboard: [317.219, 469.210, 308.406]
 
+    # axle pivot points
+    pivot_inboard:  [277.000, 115.000, 430.265]
+    pivot_outboard: [275.000, 579.302, 300.377]
+
     # wheel points
     wheel_center:  [275.000, 695.000, 305.066]
-    wheel_spindle: [275.000, 579.302, 300.377]
 
   rear:
     _type: 'SemiTrailingLink'

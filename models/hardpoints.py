@@ -5,12 +5,12 @@ import yaml
 from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
+# ours
+from models.corners.double_a_arm import DoubleAArmNumeric
+from models.corners.semi_trailing_link import SemiTrailingLinkNumeric
+
 # third-party
 import numpy as np
-
-# ours
-from models.double_a_arm_numeric import DoubleAArmNumeric
-from models.semi_trailing_numeric import SemiTrailingLinkNumeric
 
 class Vehicle:
     nickname: str
@@ -112,6 +112,10 @@ class DoubleAArm(Hardpoints):
     s_ib: np.ndarray        # shock inboard
     s_ob: np.ndarray        # shock outboard
 
+    # pivot points
+    piv_ib:  np.ndarray      # in-board pivot center (cv)
+    piv_ob:  np.ndarray      # out-board pivot center (cv)
+
     # wheel points
     wc: np.ndarray          # wheel center point
 
@@ -129,6 +133,8 @@ class DoubleAArm(Hardpoints):
             s_loc=str(data['shock_location']),
             s_ib =np.array(data['shock_inboard']),
             s_ob =np.array(data['shock_outboard']),
+            piv_ib=np.array(data['pivot_inboard']),
+            piv_ob=np.array(data['pivot_outboard']),
             wc   =np.array(data['wheel_center']),
         )
 
@@ -141,6 +147,8 @@ class DoubleAArm(Hardpoints):
             "lower_rear": float(np.linalg.norm(hp.lbj - hp.lr)),
             "tie_rod": float(np.linalg.norm(hp.tr_ib - hp.tr_ob)),
             "shock_static": float(np.linalg.norm(hp.s_ib - hp.s_ob)),
+            "axle_ib_ob_static": float(np.linalg.norm(hp.piv_ib - hp.piv_ob)),
+            "axle_ob_wc": float(np.linalg.norm(hp.piv_ob - hp.wc)),
         }
 
 @dataclass

@@ -1,6 +1,9 @@
 # default
 from __future__ import annotations
-from typing import Dict
+
+# ours
+from models.joints.axle import Axle
+from models.joints.cv_joint import CVJoint, PlungingCVJoint
 
 # third-party
 import numpy as np
@@ -25,6 +28,16 @@ class DoubleAArmNumeric:
             self.s_rel_pt = hp.lbj
             print("Assuming Lower A Arm mounted shock point...")
 
+        # passive axle
+        self.axle_static_len = np.linalg.norm(hp.piv_ob - hp.piv_ib)
+        self.piv_ob_loc = hp.piv_ob - hp.lbj
+
+        self.axle = Axle(
+            joint1=PlungingCVJoint(max_angle=30, plunge_limit=30.0), # Inboard slider
+            joint2=CVJoint(max_angle=30), # Outboard fixed
+            length=self.axle_static_len
+        )
+
     def reset(self):
         # reset the prev x to the default guess
         self._x_prev = np.hstack([self.hp.lbj, np.zeros(3)])
@@ -32,34 +45,6 @@ class DoubleAArmNumeric:
     @staticmethod
     def _rot(eul: np.ndarray) -> np.ndarray:
         return R.from_euler("xyz", eul).as_matrix()
-    
-    def _rim_points(self, wc: np.ndarray, Rw: np.ndarray) -> Dict[str, np.ndarray]:
-        # wheel axis in world
-        n = Rw[:, 1]
-        
-        def project(axis: np.ndarray):
-            v = axis - np.dot(axis, n) * n
-            l2 = np.dot(v, v)
-            return None if l2 < 1e-9 else wc + v / np.sqrt(l2) * self.hp.wr
-        
-        pts = {}
-        xp = project(np.array([1., 0., 0.]))
-        if xp is not None:
-            pts["W_Xp"] = xp
-            pts["W_Xm"] = wc - (xp - wc)
-
-        # should never be needed
-        yp = project(np.array([0., 1., 0.]))
-        if yp is not None:
-            pts["W_Yp"] = yp
-            pts["W_Ym"] = wc - (yp - wc)
-
-        zp = project(np.array([0., 0., 1.]))
-        if zp is not None:
-            pts["W_Zp"] = zp
-            pts["W_Zm"] = wc - (zp - wc)
-
-        return pts
     
     def solve(
             self,
@@ -145,6 +130,14 @@ class DoubleAArmNumeric:
         s_rel_pt_loc = ubj if hp.s_loc == 'upper' else lbj
         sha = s_rel_pt_loc + sh_vec
 
+        # axle calcs
+        piv_ob = world(self.piv_ob_loc)
+        n_ib_dir = 1.0 if hp.piv_ib[1] > 0 else -1.0
+        n_ib = np.array([0.0, n_ib_dir, 0.0])
+        n_ob_dir = -1.0 if hp.wc[1] > 0 else 1.0
+        n_ob = Rw @ np.array([0.0, n_ob_dir, 0.0])
+        axle_state = self.axle.get_state(hp.piv_ib, piv_ob, n_ib, n_ob)
+
         step = {
             "lbj": lbj,
             "ubj": ubj,
@@ -153,10 +146,6 @@ class DoubleAArmNumeric:
             "tr_ib": tr_ib_offset,
             "tr_ob": tr_ob,
             "wheel_axis": Rw[:, 1],  # for plotting
+            "axle_data": axle_state,
         }
-        
-        # get wheel points
-        step.update(self._rim_points(wc, Rw))
-
-        # return resolved points
         return step

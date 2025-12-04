@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # ours
-from scripts.hardpoints import DoubleAArm, SemiTrailingLink
+from models.hardpoints import DoubleAArm, SemiTrailingLink
 
 def _compute_wheel_cylinder(
     wc: np.ndarray,
@@ -84,6 +84,11 @@ class SCALAR_CHARACTERISTIC(Enum):
     CAMBER = auto()
     CASTER = auto()
     TOE    = auto()
+
+class AXLE_CHARACTERISTIC(Enum):
+    PLUNGE = auto()     # mm
+    ANGLE_IB = auto()   # deg
+    ANGLE_OB = auto()   # deg
 
 class POINT_AXIS(Enum):
     X      = 0
@@ -380,16 +385,16 @@ class CharacteristicPlotter(PlotterBase):
     def __init__(self, char: SCALAR_CHARACTERISTIC):
         self.char = char
         titles = {
-            SCALAR_CHARACTERISTIC.CAMBER: ("Camber vs Step", "Camber [deg]"),
-            SCALAR_CHARACTERISTIC.CASTER: ("Caster vs Step", "Caster [deg]"),
-            SCALAR_CHARACTERISTIC.TOE   : ("Toe vs Step",    "Toe [deg]"),
+            SCALAR_CHARACTERISTIC.CAMBER: ("Camber vs Shock Travel", "Camber [deg]"),
+            SCALAR_CHARACTERISTIC.CASTER: ("Caster vs Shock Travel", "Caster [deg]"),
+            SCALAR_CHARACTERISTIC.TOE   : ("Toe vs Shock Travel",    "Toe [deg]"),
         }
         title, ylabel = titles[char]
 
         # one-liner does all the boiler-plate
         self.fig, self.ax = self._make_axes(
             is_3d=False,
-            xlabel="Step",
+            xlabel="Shock Travel [mm]",
             ylabel=ylabel,
             title=title,
         )
@@ -415,9 +420,9 @@ class PointPlotter(PlotterBase):
 
         self.fig, self.ax = self._make_axes(
             is_3d=False,
-            xlabel="Step",
+            xlabel="Shock Travel [mm]",
             ylabel=f"{axis.name}-coordinate [mm]",
-            title=f"{point_key} – {axis.name} vs Step",
+            title=f"{point_key} – {axis.name} vs Shock Travel",
         )
 
         self._xs, self._ys = [], []
@@ -431,6 +436,52 @@ class PointPlotter(PlotterBase):
 
         self._xs.append(len(self._ys))
         self._ys.append(value)
+
+        self._line.set_data(self._xs, self._ys)
+        self.ax.relim()
+        self.ax.autoscale_view()
+        plt.draw()
+
+class AxleCharacteristicsPlotter(PlotterBase):
+    def __init__(self, char: AXLE_CHARACTERISTIC):
+        self.char = char
+        titles = {
+            AXLE_CHARACTERISTIC.PLUNGE:   ("Axle Plunge vs Shock Travel", "Plunge [mm]"),
+            AXLE_CHARACTERISTIC.ANGLE_IB: ("Inboard CV Angle vs Shock Travel", "Angle [deg]"),
+            AXLE_CHARACTERISTIC.ANGLE_OB: ("Outboard CV Angle vs Shock Travel", "Angle [deg]"),
+        }
+        title, ylabel = titles[char]
+
+        self.fig, self.ax = self._make_axes(
+            is_3d=False,
+            xlabel="Shock Travel [mm]",
+            ylabel=ylabel,
+            title=title,
+        )
+
+        self._xs, self._ys = [], []
+        self._line, = self.ax.plot([], [], "-o", lw=1.5)
+
+    def update(self, step: Dict[str, np.ndarray]):
+        """
+        Extract axle data from the step dictionary.
+        Requires step['axle_data'] to be present.
+        """
+        if "axle_data" not in step:
+            return 
+            
+        data = step["axle_data"]
+        
+        val = 0.0
+        if self.char == AXLE_CHARACTERISTIC.PLUNGE:
+            val = data["plunge_mm"]
+        elif self.char == AXLE_CHARACTERISTIC.ANGLE_IB:
+            val = data["angle_ib_deg"]
+        elif self.char == AXLE_CHARACTERISTIC.ANGLE_OB:
+            val = data["angle_ob_deg"]
+
+        self._xs.append(len(self._ys))
+        self._ys.append(val)
 
         self._line.set_data(self._xs, self._ys)
         self.ax.relim()
