@@ -1,28 +1,10 @@
 # default
-import time
-from typing import Dict, Tuple, List
-import yaml
-
-# third party
-import numpy as np
+import argparse
+import sys
 
 # ours
-from models.hardpoints import Vehicle, DoubleAArm, SemiTrailingLink
-from scripts.utils.plotter import (
-    PlotterBase,
-    DoubleAArmPlotter,
-    SemiTrailingLinkPlotter,
-    CharacteristicPlotter,
-    AxleCharacteristicsPlotter,
-    AXLE_CHARACTERISTIC,
-    SCALAR_CHARACTERISTIC,
-)
-from scripts.simulation import (
-    Simulation, 
-    WheelAttitudeSimulation, 
-    JackingSimulation
-)
-from scripts.utils.wheel_utils import wheel_attitude
+from scripts.single_sim import run_single_simulation
+from scripts.optimizer import run_optimizer
 
 CORNER_MAP = {
     ("left", "front"):  "front_left",
@@ -31,69 +13,30 @@ CORNER_MAP = {
     ("right", "rear"):  "rear_right",
 }
 
-if __name__ == "__main__":
-    with open("sim_config.yml", "r") as file:
-        config = yaml.safe_load(file)
+def main():
+    parser = argparse.ArgumentParser(description="Suspension Simulation & Optimization Tool")
+    
+    # Subcommands: 'sim' or 'opt'
+    subparsers = parser.add_subparsers(dest="command", help="Mode of operation")
+    
+    # SIMULATION MODE
+    sim_parser = subparsers.add_parser("sim", help="Run a single simulation sweep")
+    sim_parser.add_argument("--config", type=str, default="sim_config.yml", help="Path to simulation config file")
 
-    hp_file = f"hardpoints/{config['HARDPOINTS']}.yml"
-    with open(hp_file, 'r') as file:
-        data = yaml.safe_load(file)
+    # OPTIMIZATION MODE
+    opt_parser = subparsers.add_parser("opt", help="Run the bump steer optimizer")
+    opt_parser.add_argument("--sim_config", type=str, default="sim_config.yml", help="Path to base simulation config")
+    opt_parser.add_argument("--opt_config", type=str, default="opt_config.yml", help="Path to optimization config")
 
-    vehicle: Vehicle = Vehicle(data)
+    args = parser.parse_args()
 
-    # Which corner are we simulating?
-    side = config.get("SIDE", "right") # default to right
-    half = config.get("HALF", "front") # default to front
-    corner = getattr(vehicle, CORNER_MAP[(side, half)])
-
-    # Pick simulation
-    simulation: Simulation
-    if config['SIMULATION'] == 'wheel_attitude':
-        simulation = WheelAttitudeSimulation(vehicle, config)
-        steps = simulation.run(corner=corner)
-    elif config['SIMULATION'] == 'jacking':
-        simulation = JackingSimulation(vehicle, config)
-        steps = simulation.run(half=half)
+    if args.command == "sim":
+        run_single_simulation(CORNER_MAP, args.config)
+    elif args.command == "opt":
+        run_optimizer(CORNER_MAP, args.sim_config, args.opt_config)
     else:
-        raise ValueError("SIMULATION must be 'wheel_attitude' or 'jacking'.")
+        parser.print_help()
+        sys.exit(1)
 
-    # Create and populate plots
-    plots: List[PlotterBase] = []
-    if config["PLOTS"]["CAMBER"]:
-        plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.CAMBER))
-    if config["PLOTS"]["CASTER"] and half == 'front':
-        plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.CASTER))
-    if config["PLOTS"]["TOE"]:
-        plots.append(CharacteristicPlotter(SCALAR_CHARACTERISTIC.TOE))
-
-    if config["PLOTS"].get("AXLE_PLUNGE", False):
-        plots.append(AxleCharacteristicsPlotter(AXLE_CHARACTERISTIC.PLUNGE))
-    if config["PLOTS"].get("AXLE_ANGLES", False):
-        plots.append(AxleCharacteristicsPlotter(AXLE_CHARACTERISTIC.ANGLE_IB))
-        plots.append(AxleCharacteristicsPlotter(AXLE_CHARACTERISTIC.ANGLE_OB))
-
-    if config["PLOTS"].get("3D", False):
-        hp = corner.hardpoints
-        if half == 'front' and isinstance(hp, DoubleAArm):
-            plots.append(DoubleAArmPlotter(hp))
-        elif half == 'rear' and isinstance(hp, SemiTrailingLink):
-            plots.append(SemiTrailingLinkPlotter(hp))
-
-    # Update 2D plots across steps
-    if steps:
-        for st in steps:
-            att = wheel_attitude(st)
-            
-            for plot in plots:
-                if isinstance(plot, CharacteristicPlotter):
-                    plot.update(att)
-                elif isinstance(plot, AxleCharacteristicsPlotter):
-                    plot.update(st)
-                
-        if config["PLOTS"]["3D"] and plots:
-            if isinstance(plots[-1], (DoubleAArmPlotter, SemiTrailingLinkPlotter)):
-                plots[-1].update(steps[-1])
-
-    # Display all plots
-    for plot in plots:
-        plot.display()
+if __name__ == "__main__":
+    main()

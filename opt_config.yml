@@ -1,0 +1,19 @@
+# GLOBAL OPTIMIZER
+NUM_STARTS: 5
+
+# LOCAL OPTIMIZERS
+METHOD: 'L-BFGS-B'
+TOLERANCE: 1e-3
+GRID_SEARCH_RESOLUTION: 10
+MAX_ITER: 5
+
+# PARAMETERS TO OPTIMIZE
+FREE_POINTS: 
+  "tie_rod_inboard":
+    x: [-50.0, 50.0]
+    y: [-20.0, 20.0]
+    z: [-50.0, 50.0]
+  "tie_rod_outboard":
+    x: [0.090, 0.090]
+    y: [-10.183, -10.183]
+    z: [-29.991, -29.991]

@@ -15,43 +15,87 @@ class Simulation:
     def run(self, **kwargs):
         raise NotImplementedError
 
-
 class WheelAttitudeSimulation(Simulation):
     def run(self, corner: Corner):
         solver = corner.solver
         steps = []
+        count = self.config['SIM_STEPS']
 
-        # fix: front (pos[1] == 0) -> travel & steer; rear -> travel only
         if corner.pos[1] == 0:
-            travel_values = (
-                np.linspace(self.config['TRAVEL']['MIN'], self.config['TRAVEL']['MAX'], self.config['SIM_STEPS'], True)
-                if self.config['TRAVEL']['ENABLE'] else [self.config['TRAVEL']['VALUE']] * self.config['SIM_STEPS']
-            )
-            steer_values = (
-                np.linspace(self.config['STEER']['MIN'], self.config['STEER']['MAX'], self.config['SIM_STEPS'], True)
-                if self.config['STEER']['ENABLE'] else [self.config['STEER']['VALUE']] * self.config['SIM_STEPS']
-            )
-            for travel, steer in zip(travel_values, steer_values):
-                step = solver.solve(travel_mm=travel, steer_mm=steer)
-                if step:
-                    steps.append(step)
+
+            # front
+            mode = self.config["SIMULATION"]
+
+            if mode == "steer":
+                print("here3")
+                steer_vals = np.linspace(self.config['STEER']['MIN'], self.config['STEER']['MAX'], count)
+                bump_vals = [0.0] * count
+
+                for steer, bump in zip(steer_vals, bump_vals):
+                    step = solver.solve(steer_mm=steer, bump_z=bump)
+                    if step:
+                        steps.append(step)
+
+                return steps
+
+            elif mode == "travel":
+                travel_vals = np.linspace(self.config['TRAVEL']['MIN'], self.config['TRAVEL']['MAX'], count)
+
+                for travel in travel_vals:
+                    step = solver.solve(travel_mm=travel)
+                    if step:
+                        steps.append(step)
+
+            elif mode == "steer_travel":
+                steer_vals = np.linspace(self.config['STEER']['MIN'], self.config['STEER']['MAX'], count)
+                travel_vals = np.linspace(self.config['TRAVEL']['MIN'], self.config['TRAVEL']['MAX'], count)
+
+                for travel, steer in zip(travel_vals, steer_vals):
+                    step = solver.solve(travel_mm=travel, steer_mm=steer)
+                    if step:
+                        steps.append(step)
         else:
-            travel_values = (
-                np.linspace(self.config['TRAVEL']['MIN'], self.config['TRAVEL']['MAX'], self.config['SIM_STEPS'], True)
-                if self.config['TRAVEL']['ENABLE'] else [self.config['TRAVEL']['VALUE']]
-            )
-            for travel in travel_values:
+            # rear
+            if "steer" in self.config["SIMULATION"]: 
+                print("Warning: Steer input ignored for rear corner simulation.")
+                return 
+
+            travel_vals = np.linspace(self.config['TRAVEL']['MIN'], self.config['TRAVEL']['MAX'], count)
+            for travel in travel_vals:
                 step = solver.solve(travel_mm=travel)
                 if step:
                     steps.append(step)
 
         return steps
 
-class JackingSimulation(Simulation):
-    def run(self, half: str):
-        if half not in ['front', 'rear']:
-            raise ValueError("half must be 'front' or 'rear'")
+class AckermannSimulation(Simulation):
+    def run(self):
+        results = []
 
-        # TODO: implement jacking response (left/right)
-        # For now, just return an empty list to keep interface consistent.
-        return []
+        # Identify front corners
+        front_corners = [self.vehicle.front_left, self.vehicle.front_right]
+
+        if not front_corners:
+            return results
+
+        bump_z = 0.0
+
+        # Generate sweep values
+        steer_steps = self.config['SIM_STEPS']
+        steer_values = np.linspace(self.config['STEER']['MIN'], self.config['STEER']['MAX'], steer_steps, True)
+
+        for steer_mm in steer_values:
+            step_data = {
+                "input": {
+                    "steer_mm": steer_mm,
+                    "bump_z": bump_z
+                },
+                "corners": {}
+            }
+            for corner in front_corners:
+                solution = corner.solver.solve(bump_z=bump_z, steer_mm=steer_mm)
+                if solution:
+                    key = corner.pos[0]
+                    step_data["corners"][key] = solution
+            results.append(step_data)
+        return results

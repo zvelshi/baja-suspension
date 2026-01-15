@@ -23,10 +23,8 @@ class DoubleAArmNumeric:
         self.s_rel_pt = hp.ubj
         if hp.s_loc == 'upper':
             self.s_rel_pt = hp.ubj
-            print("Assuming Upper A Arm mounted shock point...")
         else:
             self.s_rel_pt = hp.lbj
-            print("Assuming Lower A Arm mounted shock point...")
 
         # passive axle
         self.axle_static_len = np.linalg.norm(hp.piv_ob - hp.piv_ib)
@@ -106,8 +104,18 @@ class DoubleAArmNumeric:
 
             return r
 
-        lb = np.array([0.0, 0.0, -np.inf, -np.inf, -np.inf, -np.pi/2])
-        ub = np.array([np.inf, np.inf, np.inf, np.inf, np.inf, np.pi/2])
+        # Detect side based on Wheel Center Y-coordinate
+        is_right_side = hp.wc[1] < 0
+
+        if is_right_side:
+            # right: X >= 0, Y <= 0
+            lb = np.array([0.0, -np.inf, -np.inf, -np.inf, -np.inf, -np.pi/2])
+            ub = np.array([np.inf, 0.0,   np.inf,  np.inf,  np.inf,  np.pi/2])
+        else:
+            # left: X >= 0, Y >= 0
+            lb = np.array([0.0, 0.0,    -np.inf, -np.inf, -np.inf, -np.pi/2])
+            ub = np.array([np.inf, np.inf, np.inf, np.inf, np.inf, np.pi/2])
+
         sol = least_squares(
             res, 
             self._x_prev, 
@@ -145,7 +153,7 @@ class DoubleAArmNumeric:
             "s_ob": sha,
             "tr_ib": tr_ib_offset,
             "tr_ob": tr_ob,
-            "wheel_axis": Rw[:, 1],  # for plotting
+            "wheel_axis": Rw[:, 1], # for plotting
             "axle_data": axle_state,
         }
         return step

@@ -31,16 +31,35 @@ You will only need to do the set up steps once. After that, to run it, you can:
 - For example, to run a simulation of the **front suspension** with **2026 hardpoints**, set the following in `sim_config.yml`
     ```yml
     HARDPOINTS: '2026'
-    TYPE:       'front'
+    SIM_STEPS:  330 
+    SIMULATION: 'steer_travel' # 'steer', 'steer_travel', 'travel', 'ackermann'
+
+    HALF: 'front' # 'front' or 'rear'
+    SIDE: 'right' # 'left' or 'right'
+
+    TRAVEL:
+    MIN: -90  # [mm] Min range to sweep TRAVEL through during sim 
+    MAX:  240 # [mm] Max for range to sweep TRAVEL through during sim
+
+    STEER: 
+    MIN: -40 # [mm] Min for range to sweep STEER through during sim
+    MAX:  40 # [mm] Max for range to sweep STEER through during sim
 
     PLOTS:
-    CAMBER:   True
-    TOE:      True
-    CASTER:   True
-    3D:       True
+    3D:           True
+    CAMBER:       True
+    TOE:          True
+    CASTER:       True
+    AXLE_PLUNGE:  True
+    AXLE_ANGLES:  True
     ```
 
-2. Run the main script
+2. 
+- Run the single simulation script via
     ```python
-    python main.py
-    ``` 
+    py main.py sim
+    ```
+- Run the global optimizer script via
+    ```python
+    py main.py opt
+    ```
