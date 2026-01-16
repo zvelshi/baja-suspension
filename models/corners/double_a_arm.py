@@ -49,15 +49,15 @@ class DoubleAArmNumeric:
             travel_mm : float | None = None,
             bump_z    : float | None = None,
             steer_mm  : float = 0.0,
-        ):        
+        ):
         if (travel_mm is None) == (bump_z is None):
-                raise ValueError("Specify exactly ONE of travel_mm or bump_z")
+            raise ValueError("Specify exactly ONE of travel_mm or bump_z")
 
         hp = self.hp
         target_shock = self._shock0 - travel_mm if travel_mm is not None else None
         if target_shock and not (hp.shock_min <= target_shock <= hp.shock_max):
             return None
-    
+
         target_wheel = self._wc0 + bump_z if bump_z is not None else None
 
         target_tie   = self.len["tie_rod"]

@@ -2,38 +2,117 @@
 import argparse
 import sys
 
-# ours
-from scripts.single_sim import run_single_simulation
-from scripts.optimizer import run_optimizer
+# third-party
+import yaml
 
-CORNER_MAP = {
-    ("left", "front"):  "front_left",
-    ("right", "front"): "front_right",
-    ("left", "rear"):   "rear_left",
-    ("right", "rear"):  "rear_right",
-}
+# ours
+from models.vehicle import Vehicle
+from simulations.scenarios import SuspensionSweep, AckermannScenario
+from optimization.engine import SuspensionOptimizer, BumpSteerObjective
+from utils.plotting import Plotter, CostCloudPlotter
+
+def load_vehicle(sim_config_path: str):
+    """Helper to load config and vehicle objects."""
+    with open(sim_config_path, "r") as f:
+        config = yaml.safe_load(f)
+    
+    hp_file = f"config/hardpoints/{config['HARDPOINTS']}.yml"
+    with open(hp_file, 'r') as f:
+        hp_data = yaml.safe_load(f)
+        
+    vehicle = Vehicle(hp_data)
+    return vehicle, config
+
+def handle_simulation(args):
+    print(f"--- Simulation Mode: {args.config} ---")
+    vehicle, config = load_vehicle(args.config)
+    
+    sim_type = config.get("SIMULATION", "travel")
+    scenario = None
+    
+    if sim_type == "ackermann":
+        print("-> Running Ackermann Steering Geometry Analysis...")
+        scenario = AckermannScenario(vehicle, config)
+    
+    elif sim_type in ["steer", "travel", "steer_travel"]:
+        corner_id = [0, 0]
+        if config["HALF"] == 'rear':
+            corner_id[1] = 1
+        elif config["SIDE"] == 'right':
+            corner_id[0] = 1
+
+        print(f"-> Running Single Corner Sweep: {corner_id} [{sim_type}]...")
+        scenario = SuspensionSweep(vehicle, corner_id, sim_type, config)
+
+    else:
+        print(f"Error: Unknown simulation type '{sim_type}'")
+        return
+
+    results = scenario.run()
+    if not results:
+        print("No valid solution steps returned. Check geometry constraints.")
+        return
+
+    print(f"-> Generating Plots ({len(results)} steps)...")
+    plotter = Plotter(title=f"Sim: {sim_type}")
+
+    if sim_type == "ackermann":
+        plotter.plot_3d_ackermann(results, vehicle)
+        plotter.plot_ackermann_curve(results)
+    else:
+        id = [0, 0]
+        if config["HALF"] == 'rear':
+            id = [id[0], 1]
+        if config["SIDE"] == 'right':
+            id = [1, id[1]]
+        corner = vehicle.get_corner_from_id(id)
+        plotter.plot_3d_corner(results, corner.hardpoints)
+        plotter.plot_kinematics_curves(results)
+    plotter.show()
+
+def handle_optimization(args):
+    print(f"--- Optimization Mode ---")
+    vehicle, sim_config = load_vehicle(args.sim_config)
+    
+    with open(args.opt_config, "r") as f:
+        opt_config = yaml.safe_load(f)
+    config = {**sim_config, **opt_config}
+
+    print("-> Objective: Minimum Bump Steer (Travel Sweep)")
+    
+    travel_min = sim_config['TRAVEL']['MIN']
+    travel_max = sim_config['TRAVEL']['MAX']
+    objective = BumpSteerObjective(travel_range=(travel_min, travel_max))
+
+    optimizer = SuspensionOptimizer(vehicle, config, objective)
+    best_coords = optimizer.run() 
+    
+    print("\nOptimization Complete.")
+    print(f"Best Coordinates: {best_coords}")
+
+    if optimizer.history:
+        print("-> Plotting Optimization Cloud...")
+        plotter = CostCloudPlotter(title="Bump Steer Landscape")
+        plotter.plot_cloud(optimizer.history)
+        plotter.show()
 
 def main():
     parser = argparse.ArgumentParser(description="Suspension Simulation & Optimization Tool")
-    
-    # Subcommands: 'sim' or 'opt'
     subparsers = parser.add_subparsers(dest="command", help="Mode of operation")
     
-    # SIMULATION MODE
-    sim_parser = subparsers.add_parser("sim", help="Run a single simulation sweep")
-    sim_parser.add_argument("--config", type=str, default="sim_config.yml", help="Path to simulation config file")
+    sim_parser = subparsers.add_parser("sim", help="Run a kinematic simulation")
+    sim_parser.add_argument("--config", type=str, default="config/sim_config.yml", help="Path to sim config")
 
-    # OPTIMIZATION MODE
-    opt_parser = subparsers.add_parser("opt", help="Run the bump steer optimizer")
-    opt_parser.add_argument("--sim_config", type=str, default="sim_config.yml", help="Path to base simulation config")
-    opt_parser.add_argument("--opt_config", type=str, default="opt_config.yml", help="Path to optimization config")
+    opt_parser = subparsers.add_parser("opt", help="Run the optimizer")
+    opt_parser.add_argument("--sim_config", type=str, default="config/sim_config.yml", help="Base sim config")
+    opt_parser.add_argument("--opt_config", type=str, default="config/opt_config.yml", help="Optimization config")
 
     args = parser.parse_args()
 
     if args.command == "sim":
-        run_single_simulation(CORNER_MAP, args.config)
+        handle_simulation(args)
     elif args.command == "opt":
-        run_optimizer(CORNER_MAP, args.sim_config, args.opt_config)
+        handle_optimization(args)
     else:
         parser.print_help()
         sys.exit(1)

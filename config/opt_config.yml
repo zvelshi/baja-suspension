@@ -1,14 +1,14 @@
 # GLOBAL OPTIMIZER
-GRID_SEARCH_RESOLUTION: 100
-NUM_STARTS: 100
+GRID_SEARCH_RESOLUTION: 50
+FINE_POINT_SEARCH_AGENTS: 50
 
 # PARAMETERS TO OPTIMIZE
 FREE_POINTS: 
-  "tie_rod_inboard":
+  "tr_ib":
     x: [-50.0, 50.0]
     y: [-20.0, 20.0]
     z: [-50.0, 50.0]
-  "tie_rod_outboard":
+  "tr_ob":
     x: [0.090, 0.090]
     y: [-10.183, -10.183]
     z: [-29.991, -29.991]
