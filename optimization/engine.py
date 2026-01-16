@@ -233,7 +233,7 @@ class SuspensionOptimizer:
                 options={'maxiter': 500}
             )
             
-            print(f"Converged to {res.fun:.4f}")
+            print(f"Converged to {res.fun:.4f} with point {res.x}")
             
             if res.fun < best_cost:
                 best_cost = res.fun

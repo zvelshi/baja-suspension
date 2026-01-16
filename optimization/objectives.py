@@ -29,5 +29,4 @@ class MinimumBumpSteer(OptimizationObjective):
         return max_abs_toe + toe_range
 
     def get_simulation_config(self):
-        # Force the sim to run in 'travel' mode for bump steer
         return {"SIMULATION": "travel"}
