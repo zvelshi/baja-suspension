@@ -36,58 +36,26 @@ def wheel_attitude(step: Dict[str, np.ndarray]) -> Dict[str, float]:
     }
 
 def ackermann_percent(step: Dict, vehicle: Vehicle, steer_mm: float) -> float:
-    toe_l, toe_r = None, None
+    wb = abs(vehicle.front_left.hardpoints.wc[0] - vehicle.rear_left.hardpoints.wc[0])
+    tw = abs(vehicle.front_left.hardpoints.wc[1] - vehicle.front_right.hardpoints.wc[1])
 
-    # Iterate through corners to find Left and Right Toe
     toe_l = get_toe_angle(step["corners"][0])
     toe_r = get_toe_angle(step["corners"][1])
 
-    if toe_l is None or toe_r is None:
-        return 0.0
-    
-    # Determine Turning Direction
-    if abs(toe_l) < 0.1 and abs(toe_r) < 0.1:
-        return 0.0
-
-    if steer_mm < 0: # Turning Left
+    if steer_mm < 0: # Turning left
         actual_inner = toe_l
         outer = toe_r
-    else: # Turning Right
+    else: # Turning right
         actual_inner = toe_r
         outer = toe_l
 
-    # Calculate Ideal Ackermann
-    # Track & Wheelbase
-    wb = abs(vehicle.front_left.hardpoints.wc[0] - vehicle.rear_left.hardpoints.wc[0])
-    trw = abs(vehicle.front_left.hardpoints.wc[1] - vehicle.front_right.hardpoints.wc[1])
+    ideal_inner = np.rad2deg(np.arctan(1 / (1 / np.tan(np.deg2rad(outer)) - (tw / wb))))
 
-    # Force Absolute Magnitudes for Geometry Math
-    abs_inner = abs(actual_inner)
-    abs_outer = abs(outer)
+    actual_delta = actual_inner - outer
+    ideal_delta = ideal_inner - outer
 
-    # Ideal ackermann angle
-    outer_rad = np.deg2rad(abs_outer)
-    cot_outer = 1.0 / np.tan(outer_rad)
-    
-    # cot(ideal) = cot(outer) - (track / wheelbase)
-    cot_ideal_inner = cot_outer - (trw / wb)
-    
-    # Handle parallel steering edge case (cot = 0)
-    if cot_ideal_inner == 0:
-         ideal_inner = 90.0
-    else:
-         ideal_inner_rad = np.arctan(1.0 / cot_ideal_inner)
-         ideal_inner = np.rad2deg(ideal_inner_rad)
-
-    # Calculate Percent based on magnitudes
-    actual_delta = abs_inner - abs_outer
-    ideal_delta = ideal_inner - abs_outer
-
-    # Avoid division by zero if ideal geometry is parallel (ideal_delta ~ 0)
-    if abs(ideal_delta) < 0.001:
-        return 0.0
-    
-    return (actual_delta / ideal_delta) * 100.0
+    ack = (actual_delta / ideal_delta) * 100 if ideal_delta != 0 else 0.0
+    return ack
 
 def get_toe_angle(step: Dict) -> float:
         n = step["wheel_axis"] 

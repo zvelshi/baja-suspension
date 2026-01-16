@@ -223,8 +223,8 @@ class SuspensionOptimizer:
             # Use callback to update progress per step if needed, or just end of run
             res = minimize(
                 self.objective_function, x_start, 
-                method=self.config["METHOD"], bounds=self.bounds, 
-                tol=self.config["TOLERANCE"], options={'maxiter': self.config["MAX_ITER"], 'disp': False}
+                method='L-BFGS-B', bounds=self.bounds, 
+                tol=1e-3, options={'maxiter': 1000, 'disp': False}
             )
             
             self.all_trajectories.append(copy.deepcopy(self.current_history))
@@ -296,9 +296,6 @@ def run_optimizer(corner_map, sim_config_path="sim_config.yml", opt_config_path=
         "OPTIMIZE_POINTS": optimize_points_list,
         "BOUNDING_BOX_XYZ_LIMITS": xyz_limits_dict,
         "GRID_SEARCH_RESOLUTION": int(opt_config["GRID_SEARCH_RESOLUTION"]),
-        "METHOD": opt_config["METHOD"],
-        "TOLERANCE": float(opt_config["TOLERANCE"]),
-        "MAX_ITER": int(opt_config["MAX_ITER"]),
         "NUM_STARTS": int(opt_config["NUM_STARTS"])
     }
 
