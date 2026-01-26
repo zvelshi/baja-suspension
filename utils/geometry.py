@@ -38,24 +38,18 @@ def get_toe_angle(step: Dict) -> float:
     n = step["wheel_axis"] 
     is_left = step["wc"][1] < 0
 
-    # Toe - angle of the wheel heading in the XY plane    
-    # Project n onto XY plane
+    # Toe - inclination of the wheel plane to longitudinal axis
     n_xy = np.array([n[0], n[1]])
     norm = np.linalg.norm(n_xy)
-    if norm < 1e-9:
+    if norm < 1e-9: 
         return 0.0
     n_xy /= norm
-    
-    # Angle relative to lateral axis (0, 1)
-    # Deviation from Y-axis
-    toe_rad = np.arctan2(n_xy[0], n_xy[1]) 
-    
-    # Sign Correction: toe-in is positive
-    toe = np.rad2deg(toe_rad)
-    if not is_left:
-        toe = -toe
 
-    return toe
+    if is_left:
+        n_xy[1] = -n_xy[1]
+
+    toe_rad = np.arctan2(n_xy[0], n_xy[1]) 
+    return np.rad2deg(toe_rad)
  
 def calculate_ackermann_percentage(
     inner_toe: float, 
