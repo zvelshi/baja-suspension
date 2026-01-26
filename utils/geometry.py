@@ -5,17 +5,9 @@ from typing import Dict, Tuple
 import numpy as np
 
 def get_wheel_attitude(step: Dict[str, np.ndarray]) -> Dict[str, float]:
-    # Get the wheel's rotation axis (wheel y-axis)
-    n = step["wheel_axis"] 
-    is_left = step["wc"][1] < 0
+    # Camber
+    camber = get_camber_angle(step)
     
-    # Camber - projection of wheel y onto global z
-    camber_rad = np.arcsin(n[2])
-    camber = np.rad2deg(camber_rad)
-    
-    if not is_left:
-        camber = -camber
-
     # Toe
     toe = get_toe_angle(step)
 
@@ -23,7 +15,7 @@ def get_wheel_attitude(step: Dict[str, np.ndarray]) -> Dict[str, float]:
     if 'ubj' in step and 'lbj' in step:
         steer_axis = step["ubj"] - step["lbj"]
         # Angle between steer axis and vertical in side view
-        caster = np.degrees(np.arctan2(-steer_axis[0], steer_axis[2]))  # +ve = rearward
+        caster = -1*np.degrees(np.arctan2(-steer_axis[0], steer_axis[2]))
     else:
         caster = 0.0    
 
@@ -32,6 +24,15 @@ def get_wheel_attitude(step: Dict[str, np.ndarray]) -> Dict[str, float]:
         "toe": toe, 
         "caster": caster,
     }
+
+def get_camber_angle(step: Dict) -> float:
+    n = step["wheel_axis"]
+
+    # Camber - inclination of the wheel plane to vertical
+    camber_rad = np.arcsin(n[2])
+    camber = np.rad2deg(camber_rad)
+
+    return -camber
 
 def get_toe_angle(step: Dict) -> float:
     n = step["wheel_axis"] 

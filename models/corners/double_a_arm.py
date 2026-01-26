@@ -36,6 +36,15 @@ class DoubleAArmNumeric:
             length=self.axle_static_len
         )
 
+        # static camber calculation
+        spindle_vec = self.hp.wc - self.hp.piv_ob
+        norm = np.linalg.norm(spindle_vec)
+        if norm < 1e-6: # check they aren't the same point
+            self.local_spindle_axis = np.array([0.0, 1.0, 0.0])
+        else:
+            self.local_spindle_axis = spindle_vec / norm
+        static_camber = -np.rad2deg(np.arcsin(self.local_spindle_axis[2]))
+
     def reset(self):
         # reset the prev x to the default guess
         self._x_prev = np.hstack([self.hp.lbj, np.zeros(3)])
@@ -142,8 +151,7 @@ class DoubleAArmNumeric:
         piv_ob = world(self.piv_ob_loc)
         n_ib_dir = 1.0 if hp.piv_ib[1] > 0 else -1.0
         n_ib = np.array([0.0, n_ib_dir, 0.0])
-        n_ob_dir = -1.0 if hp.wc[1] > 0 else 1.0
-        n_ob = Rw @ np.array([0.0, n_ob_dir, 0.0])
+        n_ob = Rw @ self.local_spindle_axis
         axle_state = self.axle.get_state(hp.piv_ib, piv_ob, n_ib, n_ob)
 
         step = {
@@ -153,7 +161,7 @@ class DoubleAArmNumeric:
             "s_ob": sha,
             "tr_ib": tr_ib_offset,
             "tr_ob": tr_ob,
-            "wheel_axis": Rw[:, 1], # for plotting
+            "wheel_axis": n_ob,
             "axle_data": axle_state,
         }
         return step

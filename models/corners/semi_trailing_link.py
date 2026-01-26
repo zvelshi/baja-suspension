@@ -30,9 +30,17 @@ class SemiTrailingLinkNumeric:
             length = axle_length,
         )
 
-        # Static vectors
+        # static vectors
         self._axle_ob_vec = hp.piv_ob - hp.wc
         self._static_forward = np.array([1.0, 0.0, 0.0])
+
+        # static camber calculation
+        spindle_vec = hp.wc - hp.piv_ob
+        norm = np.linalg.norm(spindle_vec)
+        if norm < 1e-6:
+            self.local_spindle_axis = np.array([0.0, 1.0, 0.0])
+        else:
+            self.local_spindle_axis = spindle_vec / norm
 
     def reset(self):
         self._x_prev = np.hstack([self.hp.wc, np.zeros(3)])
@@ -122,8 +130,7 @@ class SemiTrailingLinkNumeric:
         # Axle state calculation
         n_ib_dir = 1.0 if hp.piv_ib[1] > 0 else -1.0
         n_ib = np.array([0.0, n_ib_dir, 0.0])
-        n_ob_dir = -1.0 if hp.wc[1] > 0 else 1.0
-        n_ob = Rw @ np.array([0.0, n_ob_dir, 0.0])
+        n_ob = Rw @ self.local_spindle_axis
         axle_state = self.axle.get_state(hp.piv_ib, piv_ob_w, n_ib, n_ob)
 
         step = {
@@ -138,7 +145,7 @@ class SemiTrailingLinkNumeric:
             "s_ob": s_ob_w,
             "tl_f": hp.tl_f,
             "tl_f_upright": tl_f_current,
-            "wheel_axis": Rw[:, 1],
+            "wheel_axis": n_ob,
             "axle_data": axle_state
         }        
         return step
