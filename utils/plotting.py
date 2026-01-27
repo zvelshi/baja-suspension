@@ -3,6 +3,7 @@ from typing import List, Dict, Tuple
 
 # third-party
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import numpy as np
 
 # ours
@@ -268,12 +269,12 @@ class Plotter:
         ax.set_xlabel("Steering Rack [mm]")
         ax.set_ylabel("Ackermann [%]")
         ax.grid(True)
-        self.figures.append(fig)
+        self.figures.append(fig)    
 
 class CostCloudPlotter(Plotter):
     """
-    Visualizes the optimization landscape.
-    Plots every evaluated point in 3D space, colored by its cost.
+    Visualizes the optimization landscape using a Logarithmic Color Scale.
+    Plots every evaluated point in 3D space.
     """
     def plot_cloud(self, evaluated_points: List[Tuple[float, np.ndarray]]):
         """
@@ -283,15 +284,15 @@ class CostCloudPlotter(Plotter):
 
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
-        ax.set_title(f"{self.title} - Optimization Cost Landscape")
+        ax.set_title(f"{self.title} - Optimization Cost Landscape (Log Scale)")
         
         costs = []
         xs, ys, zs = [], [], []
         
-        # Unpack
+        # Unpack Data
         for cost, vec in evaluated_points:
             costs.append(cost)
-            # Assume 3 vars for 3D plot. If <3 or >3, we handle logic
+            # Handle variable dimensions for plotting
             if len(vec) >= 3:
                 xs.append(vec[0])
                 ys.append(vec[1])
@@ -307,22 +308,34 @@ class CostCloudPlotter(Plotter):
             
         costs = np.array(costs)
         
-        # Filter out exact penalties
-        valid_indices = costs < 900000 
+        # Filter out massive penalties (failed sims) so they don't skew the log scale
+        # We also need costs > 0 for LogNorm to work
+        valid_mask = (costs < 900000) & (costs > 1e-9)
         
-        if np.any(valid_indices):
-            valid_costs = costs[valid_indices]
+        if np.any(valid_mask):
+            valid_costs = costs[valid_mask]
             v_min = np.min(valid_costs)
             v_max = np.max(valid_costs)
         else:
-            # Everything failed? Just show raw
-            v_min, v_max = np.min(costs), np.max(costs)
+            # Fallback if everything failed or is zero
+            v_min, v_max = 1e-6, 1.0
             
-        p = ax.scatter(xs, ys, zs, c=costs, cmap='jet', vmin=v_min, vmax=v_max, s=30, alpha=0.4)
+        # Replace 0s or negatives with a tiny epsilon to avoid Log error
+        safe_costs = np.maximum(costs, 1e-9)
+
+        # Plot with LogNorm
+        p = ax.scatter(
+            xs, ys, zs, 
+            c=safe_costs, 
+            cmap='jet', 
+            norm=LogNorm(vmin=v_min, vmax=v_max),
+            s=30, 
+            alpha=0.6
+        )
         
         ax.set_xlabel("Var 1 (X)")
         ax.set_ylabel("Var 2 (Y)")
         ax.set_zlabel("Var 3 (Z)")
         
-        cbar = fig.colorbar(p, ax=ax, label="Cost Function (Blue=Low, Red=High)")
+        cbar = fig.colorbar(p, ax=ax, label="Cost (Log Scale)")
         self.figures.append(fig)
