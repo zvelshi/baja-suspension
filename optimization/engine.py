@@ -12,58 +12,25 @@ from scipy.optimize import minimize
 
 # ours
 from models.vehicle import Vehicle
-from simulations.solvers import SingleCornerSolver
-from utils.geometry import get_wheel_attitude
-
-class OptimizationObjective(ABC):
-    @abstractmethod
-    def calculate_cost(self, results: List[Any]) -> float:
-        pass
-    
-    @abstractmethod
-    def get_simulation_inputs(self) -> List[Dict[str, float]]:
-        """Returns a list of inputs (travel_mm, steer_mm) to run the solver on."""
-        pass
-
-class BumpSteerObjective(OptimizationObjective):
-    def __init__(self, travel_range: tuple[float, float], steps: int = 10):
-        self.travel_vals = np.linspace(travel_range[0], travel_range[1], steps)
-
-    def get_simulation_inputs(self):
-        # We want to sweep travel with 0 steer
-        return [{"travel_mm": t} for t in self.travel_vals]
-
-    def calculate_cost(self, results):
-        if not results: 
-            return 1e6
-        
-        toes = []
-        for res in results:
-            att = get_wheel_attitude(res)
-            toes.append(att['toe'])
-            
-        toes = np.array(toes)
-        
-        # Minimize max absolute toe and the total range of toe change
-        return np.max(np.abs(toes)) + (np.max(toes) - np.min(toes))
+from optimization.objectives import OptimizationObjective
+from simulations.scenarios import SuspensionSweep, AckermannScenario
 
 class SuspensionOptimizer:
     def __init__(
         self, 
         vehicle: Vehicle, 
         config: Dict, 
-        objective: OptimizationObjective
+        objectives: List[OptimizationObjective]
     ):
         self.vehicle = vehicle
         self.config = config
-        self.objective = objective
+        self.objectives = objectives
         
         self.bounds = []
         self.x0 = []
         self.points_map = [] 
         
-        self.solver = SingleCornerSolver(self.vehicle)
-
+        # Determine target corner from config for points parsing
         self.target_id = [0, 0] # Front Left default
         if config.get("HALF") == 'rear':
             self.target_id[1] = 1 
@@ -71,9 +38,7 @@ class SuspensionOptimizer:
             self.target_id[0] = 1 
             
         self.target_corner = vehicle.get_corner_from_id(self.target_id)
-
         self.history = []
-
         self._parse_config_bounds()
 
     def _parse_config_bounds(self):
@@ -100,53 +65,80 @@ class SuspensionOptimizer:
                         self.points_map.append((self.target_id, pt_name, axis_idx))
 
     def _apply_hardpoints(self, x: np.ndarray):
-        """Modifies vehicle geometry in-place."""
+        """
+        Modifies vehicle geometry in-place, both sides.
+        """
+
         for val, (c_id, pt_name, axis_idx) in zip(x, self.points_map):
             corner = self.vehicle.get_corner_from_id(c_id)
             pt_array = getattr(corner.hardpoints, pt_name)
             pt_array[axis_idx] = val
 
+            # Calculate Mirror ID: Flip side bit (0->1 or 1->0)
+            side, axle = c_id
+            mirror_id = [1 - side, axle]
+
+            try:
+                mirror_corner = self.vehicle.get_corner_from_id(mirror_id)
+                mirror_pt_array = getattr(mirror_corner.hardpoints, pt_name)
+
+                # Mirror L/R (about XZ plane):
+                # X (0) and Z (2) are identical.
+                # Y (1) is inverted (-val).
+                if axis_idx == 1:
+                    mirror_pt_array[axis_idx] = -val
+                else:
+                    mirror_pt_array[axis_idx] = val 
+            except ValueError:
+                pass
+
+    def _get_scenario_class(self, key: str):
+        if key in ['steer', 'travel', 'steer_travel']: 
+            return SuspensionSweep
+
+        if key == 'ackermann': 
+            return AckermannScenario
+
+        raise ValueError(f"Unknown scenario type: {key}")
+
     def objective_function(self, x):
         """
-        The core cost function.
-        Returns a float cost (lower is better).
+        Total Cost = Sum(Objective_i_Cost)
+        Runs multiple scenarios if objectives require different simulations.
         """
+
         self._apply_hardpoints(x)
-
-        sim_inputs = self.objective.get_simulation_inputs()
-        results = []
+        total_cost = 0.0
         
-        for inp in sim_inputs:
+        for obj in self.objectives:
+            run_config = self.config.copy()
+            run_config["SIMULATION"] = obj.get_scenario_type()
+
+            scenario_cls = self._get_scenario_class(obj.get_scenario_type())
+            scenario = scenario_cls(self.vehicle, run_config)
+
             try:
-                s_mm = inp.get('steer_mm', 0.0)
-                t_mm = inp.get('travel_mm', 0.0)
-
-                step = self.solver.solve(
-                    self.target_id, 
-                    steer_mm=s_mm, 
-                    travel_mm=t_mm
-                )
-                if step:
-                    results.append(step)
+                results = scenario.run()
+                if not results:
+                    cost = 1e6 # Penalty for failing to solve
                 else:
-                    pass
+                    cost = obj.calculate_cost(results)
+                total_cost += cost
             except Exception:
-                pass
-        
-        if not results: return 1e6
+                total_cost += 1e6
 
-        return self.objective.calculate_cost(results)
+        return total_cost
 
     def _grid_search(self, resolution: int) -> List[Tuple[float, np.ndarray]]:
         """
         Generates a dense grid of points and evaluates them in PARALLEL.
         Returns sorted list of (cost, candidate_array).
         """
+
         num_vars = len(self.bounds)
         total_points = resolution ** num_vars
 
         print(f"-> Generating Grid: {resolution} steps per var ^ {num_vars} vars = {total_points} total points")
-
         if total_points > 100000:
             print("   WARNING: Large grid size. This may take a while.")
 
@@ -165,7 +157,6 @@ class SuspensionOptimizer:
 
         with Pool(processes=cores) as pool:
             results_iter = pool.imap(self.objective_function, candidates, chunksize=50)
-
             costs = []
             for i, cost in enumerate(results_iter):
                 costs.append(cost)
@@ -178,10 +169,13 @@ class SuspensionOptimizer:
         
         self.history = evaluated
         evaluated.sort(key=lambda x: x[0])
-        
         return evaluated
 
     def run(self):
+        """
+        Main optimization routine.
+        """
+
         print(f"--- Starting Optimization ---")
         num_vars = len(self.x0)
         print(f"Optimizing {num_vars} variables for {self.target_id}")

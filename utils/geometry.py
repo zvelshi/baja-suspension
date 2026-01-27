@@ -61,10 +61,6 @@ def calculate_ackermann_percentage(
     theta_3 = abs(inner_toe)  # Actual Inner
     theta_4 = abs(outer_toe)  # Actual Outer
 
-    # Handle straight-ahead
-    if theta_4 < 1e-3:
-        return np.nan
-
     # Calculate centerline angle - this is the "requested steer angle"
     avg_angle = (theta_3 + theta_4) / 2.0
     
@@ -82,9 +78,5 @@ def calculate_ackermann_percentage(
         theta_1 = np.rad2deg(np.arctan(1.0 / (cot_center - hw_ratio)))
 
     theta_2 = np.rad2deg(np.arctan(1.0 / (cot_center + hw_ratio)))
-
-    # Prevent divide-by-zero if ideal geometry is parallel
-    if abs(theta_1 - theta_2) < 1e-3:
-        return np.nan
 
     return ((theta_3 - theta_4) / (theta_1 - theta_2)) * 100.0

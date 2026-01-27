@@ -6,9 +6,10 @@ import sys
 import yaml
 
 # ours
+import optimization.objectives as opt_objs
 from models.vehicle import Vehicle
 from simulations.scenarios import SuspensionSweep, AckermannScenario
-from optimization.engine import SuspensionOptimizer, BumpSteerObjective
+from optimization.engine import SuspensionOptimizer
 from utils.plotting import Plotter, CostCloudPlotter
 
 def load_vehicle(sim_config_path: str):
@@ -42,7 +43,7 @@ def handle_simulation(args):
             corner_id[0] = 1
 
         print(f"-> Running Single Corner Sweep: {corner_id} [{sim_type}]...")
-        scenario = SuspensionSweep(vehicle, corner_id, sim_type, config)
+        scenario = SuspensionSweep(vehicle, config)
 
     else:
         print(f"Error: Unknown simulation type '{sim_type}'")
@@ -78,14 +79,21 @@ def handle_optimization(args):
         opt_config = yaml.safe_load(f)
     config = {**sim_config, **opt_config}
 
-    print("-> Objective: Minimum Bump Steer (Travel Sweep)")
+    obj_names = config["OBJECTIVES"]
+    objectives = []
+    print(f"-> Loading Objectives: {obj_names}")
     
-    travel_min = sim_config['TRAVEL']['MIN']
-    travel_max = sim_config['TRAVEL']['MAX']
-    objective = BumpSteerObjective(travel_range=(travel_min, travel_max))
+    for name in obj_names:
+        try:
+            obj_cls = getattr(opt_objs, name)
+        except AttributeError:
+            print(f"FATAL ERROR: Objective class '{name}' not found in 'optimization.objectives'.")
+            print("Please check the spelling in opt_config.yml or the class definition.")
+            return
+        objectives.append(obj_cls())
 
-    optimizer = SuspensionOptimizer(vehicle, config, objective)
-    best_coords = optimizer.run() 
+    optimizer = SuspensionOptimizer(vehicle, config, objectives)
+    best_coords = optimizer.run()
     
     print("\nOptimization Complete.")
     print(f"Best Coordinates: {best_coords}")
