@@ -36,9 +36,10 @@ class ParallelSteer(OptimizationObjective):
         # Extract Ackermann percent values
         pcts = np.array([step['ackermann_pct'] for step in results])
 
-        # Cost = Range of Ackermann percentages
-        pct_range = np.max(pcts) - np.min(pcts)
-        return pct_range
+        # Cost = RMSE + 10% of Spread
+        rmse = np.sqrt(np.mean(pcts**2))
+        spread = np.max(pcts) - np.min(pcts)
+        return rmse + (spread * 0.1)
     
     def get_scenario_type(self):
         return 'ackermann'
