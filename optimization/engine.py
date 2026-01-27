@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 from models.vehicle import Vehicle
 from optimization.objectives import OptimizationObjective
 from simulations.scenarios import SuspensionSweep, AckermannScenario
+from utils.misc import parse_time
 
 class SuspensionOptimizer:
     def __init__(
@@ -158,10 +159,27 @@ class SuspensionOptimizer:
         with Pool(processes=cores) as pool:
             results_iter = pool.imap(self.objective_function, candidates, chunksize=50)
             costs = []
+            t_last_print = t0
+
             for i, cost in enumerate(results_iter):
                 costs.append(cost)
-                print(f"   Grid Progress: {i+1}/{total_points} ({(i+1)/total_points*100:.1f}%)", end='\r')
-        
+                
+                # Update print every second OR on the final step
+                curr_time = time.time()
+                if (curr_time - t_last_print > 1.0) or (i + 1 == total_points):
+                    processed = i + 1
+                    elapsed = curr_time - t0
+                    
+                    # Calculate Rate & ETR
+                    rate = processed / elapsed if elapsed > 0 else 0
+                    remaining = total_points - processed
+                    etr_seconds = remaining / rate if rate > 0 else 0
+                    
+                    # Format time string
+                    etr_str = parse_time(etr_seconds)
+                    print(f"   Grid Progress: {processed}/{total_points} ({processed/total_points*100:.1f}%) | Time To Complete: {etr_str}   ", end='\r')
+                    t_last_print = curr_time
+
         print(f"\n   Grid Search complete in {time.time() - t0:.2f}s")
 
         for cost, cand in zip(costs, candidates):
