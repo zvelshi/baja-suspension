@@ -1,55 +1,29 @@
 # default
-from typing import Dict, Tuple
+from typing import Dict
 
 # third-party
 import numpy as np
 
 def get_wheel_attitude(step: Dict[str, np.ndarray]) -> Dict[str, float]:
-    # Camber
-    camber = get_camber_angle(step)
-    
-    # Toe
-    toe = get_toe_angle(step)
-
-    # Caster
-    if 'ubj' in step and 'lbj' in step:
-        steer_axis = step["ubj"] - step["lbj"]
-        # Angle between steer axis and vertical in side view
-        caster = -1*np.degrees(np.arctan2(-steer_axis[0], steer_axis[2]))
-    else:
-        caster = 0.0    
-
     return {
-        "camber": camber, 
-        "toe": toe, 
-        "caster": caster,
+        "camber": get_camber_angle(step), 
+        "toe": get_toe_angle(step), 
+        "caster": get_caster_angle(step),
     }
 
 def get_camber_angle(step: Dict) -> float:
     n = step["wheel_axis"]
-
-    # Camber - inclination of the wheel plane to vertical
     camber_rad = np.arcsin(n[2])
-    camber = np.rad2deg(camber_rad)
-
-    return -camber
+    return -np.rad2deg(camber_rad)
 
 def get_toe_angle(step: Dict) -> float:
-    n = step["wheel_axis"] 
-    is_left = step["wc"][1] < 0
+    n = step["wheel_axis"]
+    toe_rad = np.arcsin(n[0])
+    return -np.rad2deg(toe_rad)
 
-    # Toe - inclination of the wheel plane to longitudinal axis
-    n_xy = np.array([n[0], n[1]])
-    norm = np.linalg.norm(n_xy)
-    if norm < 1e-9: 
-        return 0.0
-    n_xy /= norm
-
-    if is_left:
-        n_xy[1] = -n_xy[1]
-
-    toe_rad = np.arctan2(n_xy[0], n_xy[1]) 
-    return np.rad2deg(toe_rad)
+def get_caster_angle(step: Dict) -> float:
+    v = step["ubj"] - step["lbj"]
+    return np.rad2deg(np.arctan2(v[0], v[2]))
  
 def calculate_ackermann_percentage(
     inner_toe: float, 
