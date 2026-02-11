@@ -36,26 +36,34 @@ class SuspensionSweep(Scenario):
         def get_range(key):
             return np.linspace(self.config[key]['MIN'], self.config[key]['MAX'], count)
 
-        if self.config["SIMULATION"] == "steer":
+        sim_type = self.config["SIMULATION"]
+
+        if sim_type == "steer":
             steer_vals = get_range('STEER')
             for s in steer_vals:
                 res = self.solver.solve(steer_mm=s, bump_z=0.0)
                 if res: 
+                    res['x_val'] = s
+                    res['x_label'] = "Rack Travel [mm]"
                     steps.append(res)
 
-        elif self.config["SIMULATION"] == "travel":
+        elif sim_type == "travel":
             travel_vals = get_range('TRAVEL')
             for t in travel_vals:
                 res = self.solver.solve(steer_mm=0.0, travel_mm=t)
                 if res: 
+                    res['x_val'] = t
+                    res['x_label'] = "Shock Travel [mm]"
                     steps.append(res)
 
-        elif self.config["SIMULATION"] == "steer_travel":
+        elif sim_type == "steer_travel":
              s_vals = get_range('STEER')
              t_vals = get_range('TRAVEL')
              for s, t in zip(s_vals, t_vals):
                 res = self.solver.solve(steer_mm=s, travel_mm=t)
                 if res: 
+                    res['x_val'] = t # Default X-axis to travel for combined sweeps
+                    res['x_label'] = "Shock Travel [mm] (with Steer)"
                     steps.append(res)
                  
         return steps

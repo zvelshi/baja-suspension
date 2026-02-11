@@ -36,6 +36,8 @@ class SingleCornerSolver(SolverBase):
 
         try:
             step_result = corner.solver.solve(**kwargs)
+            if step_result is not None:
+                step_result.update(kwargs) 
             return step_result
         except TypeError as e:
             print(f"Solver Error on corner {self.corner_id}: {e}")

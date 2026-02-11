@@ -199,11 +199,14 @@ class Plotter:
                 plunge.append(0); angle_ib.append(0); angle_ob.append(0)
 
         # X-Axis Definition
-        if 'travel_mm' in steps[0]:
-            xs = [s.get('travel_mm', 0) for s in steps]
+        if 'x_val' in steps[0]:
+            xs = [s['x_val'] for s in steps]
+            xlabel = steps[0].get('x_label', "Input")
+        elif 'travel_mm' in steps[0]:
+            xs = [s['travel_mm'] for s in steps]
             xlabel = "Shock Travel [mm]"
         elif 'steer_mm' in steps[0]:
-            xs = [s.get('steer_mm', 0) for s in steps]
+            xs = [s['steer_mm'] for s in steps]
             xlabel = "Rack Travel [mm]"
         else:
             xs = range(len(steps))
