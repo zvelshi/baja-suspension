@@ -6,7 +6,7 @@ baja_2026:
   wheel_radius: 300 # ~23in diameter
   wheel_width: 200 # ~8in width
 
-front:
+  front:
     _type: 'DoubleAArm'
 
     # inboard a arm points
