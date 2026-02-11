@@ -6,13 +6,13 @@ baja_2026:
   wheel_radius: 300 # ~23in diameter
   wheel_width: 200 # ~8in width
 
-  front:
+front:
     _type: 'DoubleAArm'
 
     # inboard a arm points
-    upper_a_arm_front: [0.000,   220.000, 577.451]
-    upper_a_arm_rear:  [377.979, 220.000, 488.414]
-    lower_a_arm_front: [128.472, 190.000, 405.966]
+    upper_a_arm_front: [0.000, 220.000, 577.451]
+    upper_a_arm_rear:  [377.031, 220.000, 488.638]
+    lower_a_arm_front: [129.406, 190.000, 405.748]
     lower_a_arm_rear:  [430.861, 190.000, 335.364]
 
     # upright joints
@@ -25,8 +25,8 @@ baja_2026:
 
     # shock points
     shock_location: "lower"
-    shock_inboard:  [396.356, 270.000, 722.145]
-    shock_outboard: [317.219, 469.210, 308.406]
+    shock_inboard:  [423.030, 270.000, 760.497]
+    shock_outboard: [336.606, 457.657, 340.241]
 
     # axle pivot points
     pivot_inboard:  [277.000, 115.000, 430.265]
@@ -39,18 +39,18 @@ baja_2026:
     _type: 'SemiTrailingLink'
 
     # trailing link point
-    trailing_link_front: [1230.00, 275.773, 409.857]
+    trailing_link_front: [1230.000, 288.473, 351.437]
 
     # camber link points
-    upper_camber_link_inboard:  [1877.00,  60.000,  439.981]
-    upper_camber_link_outboard: [1788.087, 535.300, 344.246]
-    lower_camber_link_inboard:  [1877.000, 60.000,  389.981]
-    lower_camber_link_outboard: [1767.653, 535.300, 246.445]
+    upper_camber_link_inboard:  [1877.000, 60.000, 424.981]
+    upper_camber_link_outboard: [1783.278, 535.300, 350.603]
+    lower_camber_link_inboard:  [1877.000, 60.000, 354.981]
+    lower_camber_link_outboard: [1774.107, 535.300, 251.112]
 
     # shock points
     shock_location: "lower"
     shock_inboard:  [1696.652, 254.060, 756.518]
-    shock_outboard: [1740.944, 499.091, 377.695]
+    shock_outboard: [1732.635, 499.091, 378.470]
 
     # axle pivot points
     pivot_inboard:  [1730.000, 54.408, 431.681]
