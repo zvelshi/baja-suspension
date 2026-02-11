@@ -98,11 +98,11 @@ def handle_optimization(args):
     print("\nOptimization Complete.")
     print(f"Best Coordinates: {best_coords}")
 
-    if optimizer.history:
-        print("-> Plotting Optimization Cloud...")
-        plotter = CostCloudPlotter(title="Bump Steer Landscape")
-        plotter.plot_cloud(optimizer.history)
-        plotter.show()
+    print("-> Plotting Optimization Cloud...")
+    history_data = list(optimizer.history) 
+    plotter = CostCloudPlotter(title="Differential Evolution Search")
+    plotter.plot_cloud(history_data, optimizer.points_map)
+    plotter.show()
 
 def main():
     parser = argparse.ArgumentParser(description="Suspension Simulation & Optimization Tool")

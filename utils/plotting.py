@@ -2,9 +2,9 @@
 from typing import List, Dict, Tuple
 
 # third-party
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
-import numpy as np
 
 # ours
 from models.hardpoints import DoubleAArm, SemiTrailingLink
@@ -279,51 +279,33 @@ class CostCloudPlotter(Plotter):
     Visualizes the optimization landscape using a Logarithmic Color Scale.
     Plots every evaluated point in 3D space.
     """
-    def plot_cloud(self, evaluated_points: List[Tuple[float, np.ndarray]]):
-        """
-        evaluated_points: List of (cost, x_vector) tuples.
-        """
+    def plot_cloud(self, evaluated_points: List[Tuple[float, np.ndarray]], points_map: List):
         if not evaluated_points: return
 
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
-        ax.set_title(f"{self.title} - Optimization Cost Landscape (Log Scale)")
+        ax.set_title(f"{self.title} - Cost Landscape (Log Scale)")
         
-        costs = []
-        xs, ys, zs = [], [], []
+        costs, xs, ys, zs = [], [], [], []
         
         # Unpack Data
         for cost, vec in evaluated_points:
             costs.append(cost)
-            # Handle variable dimensions for plotting
-            if len(vec) >= 3:
-                xs.append(vec[0])
-                ys.append(vec[1])
-                zs.append(vec[2])
-            elif len(vec) == 2:
-                xs.append(vec[0])
-                ys.append(vec[1])
-                zs.append(0)
-            elif len(vec) == 1:
-                xs.append(vec[0])
-                ys.append(0)
-                zs.append(0)
+            xs.append(vec[0] if len(vec) > 0 else 0)
+            ys.append(vec[1] if len(vec) > 1 else 0)
+            zs.append(vec[2] if len(vec) > 2 else 0)
             
         costs = np.array(costs)
         
         # Filter out massive penalties (failed sims) so they don't skew the log scale
-        # We also need costs > 0 for LogNorm to work
         valid_mask = (costs < 900000) & (costs > 1e-9)
         
         if np.any(valid_mask):
             valid_costs = costs[valid_mask]
-            v_min = np.min(valid_costs)
-            v_max = np.max(valid_costs)
+            v_min, v_max = np.min(valid_costs), np.max(valid_costs)
         else:
-            # Fallback if everything failed or is zero
             v_min, v_max = 1e-6, 1.0
             
-        # Replace 0s or negatives with a tiny epsilon to avoid Log error
         safe_costs = np.maximum(costs, 1e-9)
 
         # Plot with LogNorm
@@ -332,13 +314,19 @@ class CostCloudPlotter(Plotter):
             c=safe_costs, 
             cmap='jet', 
             norm=LogNorm(vmin=v_min, vmax=v_max),
-            s=30, 
-            alpha=0.6
+            s=20, 
+            alpha=0.5
         )
         
-        ax.set_xlabel("Var 1 (X)")
-        ax.set_ylabel("Var 2 (Y)")
-        ax.set_zlabel("Var 3 (Z)")
+        # Set axis labels dynamically based on what was optimized
+        axis_names = []
+        for _, pt_name, axis_idx in points_map[:3]:
+            char = ['X', 'Y', 'Z'][axis_idx]
+            axis_names.append(f"{pt_name}.{char}")
+            
+        ax.set_xlabel(axis_names[0] if len(axis_names) > 0 else "Var 1")
+        ax.set_ylabel(axis_names[1] if len(axis_names) > 1 else "Var 2")
+        ax.set_zlabel(axis_names[2] if len(axis_names) > 2 else "Var 3")
         
-        cbar = fig.colorbar(p, ax=ax, label="Cost (Log Scale)")
+        fig.colorbar(p, ax=ax, label="Objective Cost")
         self.figures.append(fig)

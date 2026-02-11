@@ -1,14 +1,11 @@
 # default
-import random
 import time
-import itertools
-from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Tuple
-from multiprocessing import Pool, cpu_count
+from typing import List, Dict
+from multiprocessing import Manager
 
 # third-party
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import differential_evolution
 
 # ours
 from models.vehicle import Vehicle
@@ -102,7 +99,7 @@ class SuspensionOptimizer:
 
         raise ValueError(f"Unknown scenario type: {key}")
 
-    def objective_function(self, x):
+    def objective_function(self, x, shared_history=None):
         """
         Total Cost = Sum(Objective_i_Cost)
         Runs multiple scenarios if objectives require different simulations.
@@ -114,80 +111,24 @@ class SuspensionOptimizer:
         for obj in self.objectives:
             run_config = self.config.copy()
             run_config["SIMULATION"] = obj.get_scenario_type()
-
             scenario_cls = self._get_scenario_class(obj.get_scenario_type())
             scenario = scenario_cls(self.vehicle, run_config)
 
             try:
                 results = scenario.run()
                 if not results:
-                    cost = 1e6 # Penalty for failing to solve
+                    cost = 1e6 
                 else:
                     cost = obj.calculate_cost(results)
                 total_cost += cost
             except Exception:
                 total_cost += 1e6
 
+        # Safely append to the multiprocessing list if it was passed in
+        if shared_history is not None:
+            shared_history.append((total_cost, x.copy()))
+
         return total_cost
-
-    def _grid_search(self, resolution: int) -> List[Tuple[float, np.ndarray]]:
-        """
-        Generates a dense grid of points and evaluates them in PARALLEL.
-        Returns sorted list of (cost, candidate_array).
-        """
-
-        num_vars = len(self.bounds)
-        total_points = resolution ** num_vars
-
-        print(f"-> Generating Grid: {resolution} steps per var ^ {num_vars} vars = {total_points} total points")
-        if total_points > 100000:
-            print("   WARNING: Large grid size. This may take a while.")
-
-        axis_ranges = []
-        for (lower, upper) in self.bounds:
-            axis_ranges.append(np.linspace(lower, upper, resolution))
-
-        grid_points = itertools.product(*axis_ranges)
-        candidates = [np.array(pt) for pt in grid_points]
-
-        evaluated = []
-        t0 = time.time()
-
-        cores = cpu_count()
-        print(f"   Spinning up {cores} workers for grid search...")
-
-        with Pool(processes=cores) as pool:
-            results_iter = pool.imap(self.objective_function, candidates, chunksize=50)
-            costs = []
-            t_last_print = t0
-
-            for i, cost in enumerate(results_iter):
-                costs.append(cost)
-                
-                # Update print every second OR on the final step
-                curr_time = time.time()
-                if (curr_time - t_last_print > 1.0) or (i + 1 == total_points):
-                    processed = i + 1
-                    elapsed = curr_time - t0
-                    
-                    # Calculate Rate & ETR
-                    rate = processed / elapsed if elapsed > 0 else 0
-                    remaining = total_points - processed
-                    etr_seconds = remaining / rate if rate > 0 else 0
-                    
-                    # Format time string
-                    etr_str = parse_time(etr_seconds)
-                    print(f"   Grid Progress: {processed}/{total_points} ({processed/total_points*100:.1f}%) | Time To Complete: {etr_str}   ", end='\r')
-                    t_last_print = curr_time
-
-        print(f"\n   Grid Search complete in {time.time() - t0:.2f}s")
-
-        for cost, cand in zip(costs, candidates):
-            evaluated.append((cost, cand))
-        
-        self.history = evaluated
-        evaluated.sort(key=lambda x: x[0])
-        return evaluated
 
     def run(self):
         """
@@ -198,61 +139,60 @@ class SuspensionOptimizer:
         num_vars = len(self.x0)
         print(f"Optimizing {num_vars} variables for {self.target_id}")
 
+        max_generations = self.config.get("DE_MAX_GENERATIONS", 100)
+        popsize = self.config.get("DE_POPULATION_SIZE", 15)
+        tol = self.config.get("DE_TOLERANCE", 0.01)
+        mutation = tuple(self.config.get("DE_MUTATION", [0.5, 1.0]))
+        recombination = self.config.get("DE_RECOMBINATION", 0.7)
+        workers = -1
+
         print("Checking initial point...")
         initial_cost = self.objective_function(np.array(self.x0, dtype=float))
         if initial_cost >= 1e6:
             print("FATAL: Initial point invalid (Geometry broken or constraints exceeded).")
             return np.array(self.x0)
 
-        # GRID SEARCH
-        grid_res = int(self.config.get("GRID_SEARCH_RESOLUTION", 10)) 
-        sorted_results = self._grid_search(grid_res)
+        print(f"\n-> Launching Differential Evolution Global Optimizer...")
         
-        # FINE POINT SEARCH AGENTS
-        num_agents = int(self.config.get("FINE_POINT_SEARCH_AGENTS", 5))
-        
-        # Select Top N Candidates from Grid
-        start_points = [res[1] for res in sorted_results[:num_agents]]
+        t0 = time.time()
+        self.current_gen = 0
+        manager = Manager()
+        shared_history = manager.list()
 
-        # Ensure Original Design (x0) is checked
-        x0_arr = np.array(self.x0, dtype=float)
-        is_duplicate = False
-        for p in start_points:
-            if np.linalg.norm(p - x0_arr) < 1e-6:
-                is_duplicate = True
-                break
-        
-        if not is_duplicate:
-            # Insert original at the front
-            start_points.insert(0, x0_arr)
+        def custom_progress_bar(xk, convergence):
+            self.current_gen += 1
+            elapsed = time.time() - t0
+            rate = self.current_gen / elapsed if elapsed > 0 else 0
+            remaining_gens = max_generations - self.current_gen
+            etr_seconds = remaining_gens / rate if rate > 0 else 0
+            
+            conv_pct = min(convergence * 100, 100.0)
+            etr_str = parse_time(etr_seconds)
+            print(f"   Generation: {self.current_gen}/{max_generations} | Swarm Convergence: {conv_pct:.1f}% | ETR: {etr_str}   ", end='\r')
 
-        print(f"\n-> Launching {len(start_points)} Fine-Tuning Agents (Top Grid Results + Original)...")
-        
-        best_cost = float('inf')
-        best_x = None
-        
-        for i, x_start in enumerate(start_points):
-            start_cost = self.objective_function(x_start)
-            print(f"   Agent {i+1}: Start Cost {start_cost:.4f} ... ", end="")
-            
-            # Local Optimization (Gradient Descent)
-            res = minimize(
-                self.objective_function, 
-                x_start, 
-                method='L-BFGS-B', 
-                bounds=self.bounds,
-                tol=1e-4,
-                options={'maxiter': 500}
-            )
-            
-            print(f"Converged to {res.fun:.4f} with point {res.x}")
-            
-            if res.fun < best_cost:
-                best_cost = res.fun
-                best_x = res.x
+        # Run the optimizer
+        res = differential_evolution(
+            self.objective_function, 
+            bounds=self.bounds,
+            args=(shared_history,),
+            strategy='best1bin',
+            maxiter=max_generations,
+            popsize=popsize,
+            tol=tol, 
+            mutation=mutation,
+            recombination=recombination,
+            disp=False,
+            callback=custom_progress_bar,
+            workers=workers,
+            updating='deferred'
+        )
 
-        print(f"\nOptimization Complete.")
-        print(f"Global Best Cost: {best_cost:.4f}")
+        best_x = res.x
+        best_cost = res.fun
+        self.history = list(shared_history)
+
+        print(f"\n\nOptimization Complete in {time.time() - t0:.2f}s.")
+        print(f"Global Best Cost: {best_cost:.4f} (Total Geometry Evals: {res.nfev})")
         
         # Compare Best vs Original
         print("-" * 65)
