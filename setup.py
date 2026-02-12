@@ -9,5 +9,6 @@ setup(
         "scipy", 
         "matplotlib",
         "PyYAML",
+        "pymoo"
     ],
 )

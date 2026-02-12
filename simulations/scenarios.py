@@ -7,6 +7,7 @@ import numpy as np
 # ours
 from .solvers import SingleCornerSolver
 from utils.geometry import calculate_ackermann_percentage, get_toe_angle
+from utils.misc import log_to_file
 
 class Scenario:
     def run(self) -> List[Any]:
@@ -37,6 +38,7 @@ class SuspensionSweep(Scenario):
             return np.linspace(self.config[key]['MIN'], self.config[key]['MAX'], count)
 
         sim_type = self.config["SIMULATION"]
+        log_to_file(f"Starting SuspensionSweep: {sim_type} on corner {self.corner_id}")
 
         if sim_type == "steer":
             steer_vals = get_range('STEER')
@@ -46,6 +48,8 @@ class SuspensionSweep(Scenario):
                     res['x_val'] = s
                     res['x_label'] = "Rack Travel [mm]"
                     steps.append(res)
+                else:
+                    log_to_file(f"[WARN] Steer sweep step failed at {s:.2f}mm")
 
         elif sim_type == "travel":
             travel_vals = get_range('TRAVEL')
@@ -55,6 +59,8 @@ class SuspensionSweep(Scenario):
                     res['x_val'] = t
                     res['x_label'] = "Shock Travel [mm]"
                     steps.append(res)
+                else:
+                    log_to_file(f"[WARN] Travel sweep step failed at {t:.2f}mm")
 
         elif sim_type == "steer_travel":
              s_vals = get_range('STEER')
@@ -65,7 +71,9 @@ class SuspensionSweep(Scenario):
                     res['x_val'] = t # Default X-axis to travel for combined sweeps
                     res['x_label'] = "Shock Travel [mm] (with Steer)"
                     steps.append(res)
-                 
+                else:
+                    log_to_file(f"[WARN] Combined sweep step failed at steer={s:.2f}, travel={t:.2f}")
+                  
         return steps
 
 class AckermannScenario(Scenario):
@@ -81,6 +89,7 @@ class AckermannScenario(Scenario):
 
     def run(self) -> List[Dict]:
         results = []
+        log_to_file("Starting Ackermann Analysis...")
 
         wb = abs(self.vehicle.front_left.hardpoints.wc[0] - self.vehicle.rear_left.hardpoints.wc[0])
         tw = abs(self.vehicle.front_left.hardpoints.wc[1] - self.vehicle.front_right.hardpoints.wc[1])
@@ -112,5 +121,7 @@ class AckermannScenario(Scenario):
                     "right": right,
                     "ackermann_pct": ack_pct
                 })
+            else:
+                log_to_file(f"[WARN] Ackermann step failed at input {input:.2f}. Left={bool(left)}, Right={bool(right)}")
                 
         return results

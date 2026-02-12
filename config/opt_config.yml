@@ -1,14 +1,12 @@
 # GLOBAL OPTIMIZER
-DE_MAX_GENERATIONS: 100
-DE_POPULATION_SIZE: 25
-DE_TOLERANCE: 0.01
-DE_MUTATION: [0.5, 1.0]
-DE_RECOMBINATION: 0.7
+POP_SIZE: 75
+N_OFFSPRINGS: 40
+MAX_GEN: 60
 
 # OPTIMIZATION TO RUN
 OBJECTIVES: 
   - MinimumBumpSteer
-  # - ParallelSteer
+  - ParallelSteer
 
 # PARAMETERS TO OPTIMIZE
 FREE_POINTS: 
@@ -17,6 +15,6 @@ FREE_POINTS:
     y: [-20.0, 20.0]
     z: [-50.0, 50.0]
   "tr_ob":
-    x: [0.090, 0.090]
-    y: [-10.183, -10.183]
-    z: [-29.991, -29.991]
+    x: [-40.0, 40.0]
+    y: [-20.0, 5.0]
+    z: [-60.0, 0.0]

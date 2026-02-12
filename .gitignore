@@ -3,3 +3,4 @@
 .vscode/
 venv/
 *.egg-info/
+out/

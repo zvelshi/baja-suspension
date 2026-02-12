@@ -10,7 +10,8 @@ import optimization.objectives as opt_objs
 from models.vehicle import Vehicle
 from simulations.scenarios import SuspensionSweep, AckermannScenario
 from optimization.engine import SuspensionOptimizer
-from utils.plotting import Plotter, CostCloudPlotter
+from utils.plotting import Plotter, ParetoPlotter
+from utils.misc import setup_logging, log_to_file, save_configs
 
 def load_vehicle(sim_config_path: str):
     """Helper to load config and vehicle objects."""
@@ -25,8 +26,13 @@ def load_vehicle(sim_config_path: str):
     return vehicle, config
 
 def handle_simulation(args):
+    run_dir = setup_logging("sim")
+    
     print(f"--- Simulation Mode: {args.config} ---")
+    log_to_file(f"Loaded configuration arguments: {args}")
+
     vehicle, config = load_vehicle(args.config)
+    save_configs(run_dir, [args.config], config.get('HARDPOINTS'))
     
     sim_type = config.get("SIMULATION", "travel")
     scenario = None
@@ -55,7 +61,7 @@ def handle_simulation(args):
         return
 
     print(f"-> Generating Plots ({len(results)} steps)...")
-    plotter = Plotter(title=f"Sim: {sim_type}")
+    plotter = Plotter(title=f"Sim: {sim_type}", save_dir=run_dir)
 
     if sim_type == "ackermann":
         plotter.plot_3d_ackermann(results, vehicle)
@@ -72,37 +78,60 @@ def handle_simulation(args):
     plotter.show()
 
 def handle_optimization(args):
+    run_dir = setup_logging("opt")
+
     print(f"--- Optimization Mode ---")
-    vehicle, sim_config = load_vehicle(args.sim_config)
+    log_to_file("Initializing optimization sequence...")
     
+    vehicle, sim_config = load_vehicle(args.sim_config)
     with open(args.opt_config, "r") as f:
         opt_config = yaml.safe_load(f)
     config = {**sim_config, **opt_config}
+    save_configs(run_dir, [args.sim_config, args.opt_config], sim_config.get('HARDPOINTS'))
 
-    obj_names = config["OBJECTIVES"]
+    obj_names = config.get("OBJECTIVES", [])
     objectives = []
     print(f"-> Loading Objectives: {obj_names}")
     
     for name in obj_names:
         try:
             obj_cls = getattr(opt_objs, name)
+            objectives.append(obj_cls())
         except AttributeError:
             print(f"FATAL ERROR: Objective class '{name}' not found in 'optimization.objectives'.")
-            print("Please check the spelling in opt_config.yml or the class definition.")
             return
-        objectives.append(obj_cls())
+
+    if not objectives:
+        print("No objectives defined. Exiting.")
+        return
 
     optimizer = SuspensionOptimizer(vehicle, config, objectives)
-    best_coords = optimizer.run()
+    res = optimizer.run()
     
-    print("\nOptimization Complete.")
-    print(f"Best Coordinates: {best_coords}")
+    if res.X is None:
+        print("Optimization failed to find feasible solutions.")
+        return
 
-    print("-> Plotting Optimization Cloud...")
-    history_data = list(optimizer.history) 
-    plotter = CostCloudPlotter(title="Differential Evolution Search")
-    plotter.plot_cloud(history_data, optimizer.points_map)
-    plotter.show()
+    print("\n" + "="*50)
+    print(f"Pareto Set Found: {len(res.X)} solutions")
+    print("="*50)
+    
+    # Ensure F is always 2D for consistent indexing
+    if res.F.ndim == 1:
+        F_safe = res.F.reshape(-1, 1)
+    else:
+        F_safe = res.F
+
+    # Print Pareto solutions
+    for i, (f_vec, x) in enumerate(zip(F_safe, res.X)):
+        f_str = ", ".join([f"{val:.4f}" for val in f_vec])
+        log_to_file(f"Detailed Solution {i}: Vars={x}") 
+        print(f"Sol {i}: Costs = [{f_str}]")
+
+    print(f"\n-> Plotting Results...")
+
+    plotter = ParetoPlotter(optimizer, save_dir=run_dir)
+    plotter.plot_front(res, history=res.history)
 
 def main():
     parser = argparse.ArgumentParser(description="Suspension Simulation & Optimization Tool")

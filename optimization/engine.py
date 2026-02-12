@@ -1,17 +1,73 @@
 # default
 import time
 from typing import List, Dict
-from multiprocessing import Manager
 
 # third-party
 import numpy as np
-from scipy.optimize import differential_evolution
+from pymoo.core.problem import ElementwiseProblem
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.optimize import minimize
+from pymoo.termination import get_termination
 
 # ours
 from models.vehicle import Vehicle
 from optimization.objectives import OptimizationObjective
 from simulations.scenarios import SuspensionSweep, AckermannScenario
-from utils.misc import parse_time
+from utils.misc import log_to_file
+
+class SuspensionProblem(ElementwiseProblem):
+    def __init__(self, optimizer):
+        self.opt = optimizer
+        super().__init__(
+            n_var=len(optimizer.x0),
+            n_obj=len(optimizer.objectives),
+            xl=np.array([b[0] for b in optimizer.bounds]),
+            xu=np.array([b[1] for b in optimizer.bounds])
+        )
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        x_str = ", ".join([f"{v:.4f}" for v in x])
+        log_to_file(f"[EVAL] Testing Design: [{x_str}]")
+
+        self.opt._apply_hardpoints(x)
+        
+        costs = []
+        sim_cache = {}
+
+        for obj in self.opt.objectives:
+            s_type = obj.get_scenario_type()
+            
+            if s_type not in sim_cache:
+                run_config = self.opt.config.copy()
+                run_config["SIMULATION"] = s_type
+
+                scenario_cls = self.opt._get_scenario_class(s_type)
+                scenario = scenario_cls(self.opt.vehicle, run_config)
+                
+                try:
+                    results = scenario.run()
+                    sim_cache[s_type] = results
+                except Exception as e:
+                    log_to_file(f"  [CRASH] Sim '{s_type}' failed: {e}")
+                    sim_cache[s_type] = None
+
+            results = sim_cache[s_type]
+
+            if not results:
+                log_to_file(f"  [FAIL] {obj.name}: Invalid Geometry (Cost=1e6)")
+                costs.append(1e6)
+            else:
+                try:
+                    val = obj.calculate_cost(results)
+                    costs.append(val)
+                except Exception as e:
+                    log_to_file(f"  [ERROR] {obj.name} cost calc failed: {e}")
+                    costs.append(1e6)
+
+        out["F"] = np.array(costs)
+
+        c_str = ", ".join([f"{c:.6f}" for c in costs])
+        log_to_file(f"  -> Result Costs: [{c_str}]")
 
 class SuspensionOptimizer:
     def __init__(
@@ -23,20 +79,22 @@ class SuspensionOptimizer:
         self.vehicle = vehicle
         self.config = config
         self.objectives = objectives
-        
+
         self.bounds = []
         self.x0 = []
         self.points_map = [] 
-        
-        # Determine target corner from config for points parsing
+
         self.target_id = [0, 0] # Front Left default
         if config.get("HALF") == 'rear':
             self.target_id[1] = 1 
         if config.get("SIDE") == 'right':
             self.target_id[0] = 1 
-            
+
         self.target_corner = vehicle.get_corner_from_id(self.target_id)
-        self.history = []
+
+        self.pareto_front = None
+        self.pareto_set = None
+
         self._parse_config_bounds()
 
     def _parse_config_bounds(self):
@@ -99,116 +157,70 @@ class SuspensionOptimizer:
 
         raise ValueError(f"Unknown scenario type: {key}")
 
-    def objective_function(self, x, shared_history=None):
-        """
-        Total Cost = Sum(Objective_i_Cost)
-        Runs multiple scenarios if objectives require different simulations.
-        """
-
-        self._apply_hardpoints(x)
-        total_cost = 0.0
-        
-        for obj in self.objectives:
-            run_config = self.config.copy()
-            run_config["SIMULATION"] = obj.get_scenario_type()
-            scenario_cls = self._get_scenario_class(obj.get_scenario_type())
-            scenario = scenario_cls(self.vehicle, run_config)
-
-            try:
-                results = scenario.run()
-                if not results:
-                    cost = 1e6 
-                else:
-                    cost = obj.calculate_cost(results)
-                total_cost += cost
-            except Exception:
-                total_cost += 1e6
-
-        # Safely append to the multiprocessing list if it was passed in
-        if shared_history is not None:
-            shared_history.append((total_cost, x.copy()))
-
-        return total_cost
-
-    def run(self):
+def run(self):
         """
         Main optimization routine.
         """
 
-        print(f"--- Starting Optimization ---")
+        print(f"--- Starting MOO ---")
+
         num_vars = len(self.x0)
-        print(f"Optimizing {num_vars} variables for {self.target_id}")
-
-        max_generations = self.config.get("DE_MAX_GENERATIONS", 100)
-        popsize = self.config.get("DE_POPULATION_SIZE", 15)
-        tol = self.config.get("DE_TOLERANCE", 0.01)
-        mutation = tuple(self.config.get("DE_MUTATION", [0.5, 1.0]))
-        recombination = self.config.get("DE_RECOMBINATION", 0.7)
-        workers = -1
-
-        print("Checking initial point...")
-        initial_cost = self.objective_function(np.array(self.x0, dtype=float))
-        if initial_cost >= 1e6:
-            print("FATAL: Initial point invalid (Geometry broken or constraints exceeded).")
-            return np.array(self.x0)
-
-        print(f"\n-> Launching Differential Evolution Global Optimizer...")
+        num_objs = len(self.objectives)
         
-        t0 = time.time()
-        self.current_gen = 0
-        manager = Manager()
-        shared_history = manager.list()
+        pop_size = self.config.get("POP_SIZE", 40)
+        n_offsprings = self.config.get("N_OFFSPRINGS", 10)
+        
+        print(f"Optimizing {num_vars} variables for {num_objs} objectives.")
+        print(f"Population: {pop_size} | Offspring/Gen: {n_offsprings}")
+        log_to_file(f"Setup: Vars={num_vars}, Objs={num_objs}, Pop={pop_size}, Offspring={n_offsprings}")
+        log_to_file(f"Bounds: {self.bounds}")
 
-        def custom_progress_bar(xk, convergence):
-            self.current_gen += 1
-            elapsed = time.time() - t0
-            rate = self.current_gen / elapsed if elapsed > 0 else 0
-            remaining_gens = max_generations - self.current_gen
-            etr_seconds = remaining_gens / rate if rate > 0 else 0
-            
-            conv_pct = min(convergence * 100, 100.0)
-            etr_str = parse_time(etr_seconds)
-            print(f"   Generation: {self.current_gen}/{max_generations} | Swarm Convergence: {conv_pct:.1f}% | ETR: {etr_str}   ", end='\r')
+        problem = SuspensionProblem(self)
+        xl = np.array([b[0] for b in self.bounds])
+        xu = np.array([b[1] for b in self.bounds])
+        initial_pop = np.random.random((pop_size, num_vars)) * (xu - xl) + xl
+        if len(self.x0) > 0:
+            initial_pop[0, :] = np.array(self.x0)
+            log_to_file(f"Seeding Initial Design: {self.x0}")
 
-        # Run the optimizer
-        res = differential_evolution(
-            self.objective_function, 
-            bounds=self.bounds,
-            args=(shared_history,),
-            strategy='best1bin',
-            maxiter=max_generations,
-            popsize=popsize,
-            tol=tol, 
-            mutation=mutation,
-            recombination=recombination,
-            disp=False,
-            callback=custom_progress_bar,
-            workers=workers,
-            updating='deferred'
+        algorithm = NSGA2(
+            pop_size=pop_size,
+            n_offsprings=n_offsprings,
+            sampling=initial_pop,
+            eliminate_duplicates=True
         )
 
-        best_x = res.x
-        best_cost = res.fun
-        self.history = list(shared_history)
+        termination = get_termination("n_gen", self.config.get("MAX_GEN", 50))
 
-        print(f"\n\nOptimization Complete in {time.time() - t0:.2f}s.")
-        print(f"Global Best Cost: {best_cost:.4f} (Total Geometry Evals: {res.nfev})")
-        
-        # Compare Best vs Original
-        print("-" * 65)
-        print(f"{'Variable':15} | {'Original':<10} | {'New':<10} | {'Delta':<10}")
-        print("-" * 65)
-        
-        orig_vals = self.x0
-        
-        for i, val in enumerate(best_x):
-            orig = orig_vals[i]
-            delta = val - orig
-            
-            _, pt_name, axis = self.points_map[i]
-            axis_char = ['X', 'Y', 'Z'][axis]
-            label = f"{pt_name}.{axis_char}"
-            
-            print(f"{label:<15} | {orig:<10.3f} | {val:<10.3f} | {delta:<+10.3f}")
+        t0 = time.time()
+        res = minimize(
+            problem,
+            algorithm,
+            termination,
+            seed=1,
+            save_history=True,
+            verbose=True
+        )
 
-        return best_x
+        self.pareto_front = res.F
+        self.pareto_set = res.X
+
+        duration = time.time() - t0
+        print(f"\nOptimization Complete in {duration:.2f}s.")
+        print(f"Found {len(res.F)} non-dominated solutions (Pareto Front).")
+
+        log_to_file("\n" + "="*50)
+        log_to_file(f"OPTIMIZATION RESULTS (Time: {duration:.2f}s)")
+        log_to_file(f"Pareto Front Size: {len(res.F)}")
+        log_to_file("="*50)
+
+        F_safe = res.F
+        if F_safe.ndim == 1:
+            F_safe = F_safe.reshape(-1, 1)
+
+        for i, (costs, design) in enumerate(zip(F_safe, res.X)):
+            c_str = ", ".join([f"{c:.6f}" for c in costs])
+            d_str = ", ".join([f"{d:.4f}" for d in design])
+            log_to_file(f"Solution {i:03d}: Costs=[{c_str}] | Design=[{d_str}]")
+        log_to_file("="*50 + "\n")
+        return res

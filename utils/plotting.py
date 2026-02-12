@@ -1,5 +1,6 @@
 # default
-from typing import List, Dict, Tuple
+import os
+from typing import List, Dict, Tuple, Optional
 
 # third-party
 import numpy as np
@@ -49,11 +50,37 @@ def _compute_wheel_cylinder(wc, step, radius, width, n_theta=40):
     return cf, cb
 
 class Plotter:
-    def __init__(self, title="Simulation Results"):
+    def __init__(self, title="Simulation Results", save_dir=None):
         self.title = title
         self.figures = []
+        self.save_dir = save_dir
 
     def show(self):
+        if self.save_dir:
+            for i, fig in enumerate(self.figures):
+                # Attempt to generate a clean filename from the plot title
+                try:
+                    # Get title from first axes
+                    raw_title = fig.axes[0].get_title()
+                    # Clean string (remove special chars)
+                    clean_title = "".join([c if c.isalnum() else "_" for c in raw_title])
+                    clean_title = clean_title.strip("_").lower()
+                except (IndexError, AttributeError):
+                    clean_title = f"figure_{i}"
+
+                # Fallback if title is empty
+                if not clean_title:
+                    clean_title = f"figure_{i}"
+
+                fname = f"{clean_title}.png"
+                save_path = os.path.join(self.save_dir, fname)
+                
+                try:
+                    fig.savefig(save_path, dpi=150)
+                    print(f"-> Saved plot: {save_path}")
+                except Exception as e:
+                    print(f"Error saving plot {fname}: {e}")
+
         plt.show()
 
     def _set_axes_equal(self, ax):
@@ -260,7 +287,7 @@ class Plotter:
         self.figures.append(fig)
 
     def plot_ackermann_curve(self, steps: List[Dict]):
-        """Specialized plot for Ackermann % vs Steer"""
+        """Plot for Ackermann % vs Steer"""
         if not steps: return
         
         xs = [s['input'] for s in steps]
@@ -274,59 +301,114 @@ class Plotter:
         ax.grid(True)
         self.figures.append(fig)    
 
-class CostCloudPlotter(Plotter):
+class ParetoPlotter:
     """
-    Visualizes the optimization landscape using a Logarithmic Color Scale.
-    Plots every evaluated point in 3D space.
+    Visualizes Optimization Results.
     """
-    def plot_cloud(self, evaluated_points: List[Tuple[float, np.ndarray]], points_map: List):
-        if not evaluated_points: return
+    def __init__(self, optimizer, save_dir=None):
+        self.opt = optimizer
+        self.obj_names = [o.name for o in optimizer.objectives]
+        self.save_dir = save_dir # Path to save images
 
+    def _save_plot(self, name_suffix):
+        """Helper to save the current active figure"""
+        if self.save_dir:
+            fname = f"pareto_{name_suffix}.png"
+            path = os.path.join(self.save_dir, fname)
+            plt.savefig(path, dpi=200)
+            print(f"-> Saved plot: {path}")
+
+    def plot_front(self, res, history: Optional[List] = None):
+        """
+        Plots the Pareto Front and optionally the full search history.
+        
+        Args:
+            res: The pymoo Result object.
+            history: Optional list of history objects (if save_history=True was used).
+        """
+        F = res.F
+        if F is None:
+            print("No results to plot.")
+            return
+
+        if F.ndim == 1:
+            F = F.reshape(-1, 1)
+            
+        F_cloud = None
+        if history:
+            cloud_list = []
+            for algo in history:
+                if hasattr(algo, 'pop'):
+                    # Filter out failed runs (1e6)
+                    valid_pop = algo.pop.get("F")
+                    valid_pop = valid_pop[valid_pop[:, 0] < 900000] 
+                    if len(valid_pop) > 0:
+                        cloud_list.append(valid_pop)
+            
+            if cloud_list:
+                F_cloud = np.vstack(cloud_list)
+
+        n_obj = F.shape[1]
+
+        if n_obj == 1:
+            self._plot_1d_front(F, F_cloud)
+        elif n_obj == 2:
+            self._plot_2d_front(F, F_cloud)
+        elif n_obj >= 3:
+            self._plot_multidim_front(F, F_cloud)
+
+    def _plot_1d_front(self, F, F_cloud=None):
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        if F_cloud is not None:
+            costs_cloud = F_cloud.flatten()
+            ax.hist(costs_cloud, bins=30, color='lightgray', alpha=0.5, label='All Designs')
+
+        costs = F.flatten()
+        ax.hist(costs, bins=20, color='skyblue', edgecolor='black', alpha=0.7, label='Final Gen')
+        
+        best_val = np.min(costs)
+        ax.axvline(best_val, color='red', linestyle='--', linewidth=2, label=f'Best: {best_val:.4f}')
+        
+        ax.set_title(f"Objective Distribution: {self.obj_names[0]}")
+        ax.set_xlabel(f"Cost ({self.obj_names[0]})")
+        ax.set_ylabel("Count")
+        ax.legend()
+        plt.show()
+
+    def _plot_2d_front(self, F, F_cloud=None):
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        if F_cloud is not None:
+            ax.scatter(F_cloud[:, 0], F_cloud[:, 1], s=10, c='lightgray', alpha=0.3, label="Tested Designs")
+        ax.scatter(F[:, 0], F[:, 1], s=40, facecolors='none', edgecolors='blue', lw=1.5, label="Pareto Front")
+        
+        F_norm = (F - F.min(axis=0)) / (F.ptp(axis=0) + 1e-9)
+        dist = np.linalg.norm(F_norm, axis=1)
+        best_idx = np.argmin(dist)
+        
+        ax.scatter(F[best_idx, 0], F[best_idx, 1], c='red', s=100, marker='*', label="Best Balance")
+
+        ax.set_title("Pareto Front vs. Search Space")
+        ax.set_xlabel(self.obj_names[0])
+        ax.set_ylabel(self.obj_names[1])
+        ax.grid(True, linestyle='--', alpha=0.5)
+        ax.legend()
+        plt.show()
+
+    def _plot_multidim_front(self, F, F_cloud=None):
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
-        ax.set_title(f"{self.title} - Cost Landscape (Log Scale)")
         
-        costs, xs, ys, zs = [], [], [], []
-        
-        # Unpack Data
-        for cost, vec in evaluated_points:
-            costs.append(cost)
-            xs.append(vec[0] if len(vec) > 0 else 0)
-            ys.append(vec[1] if len(vec) > 1 else 0)
-            zs.append(vec[2] if len(vec) > 2 else 0)
-            
-        costs = np.array(costs)
-        
-        # Filter out massive penalties (failed sims) so they don't skew the log scale
-        valid_mask = (costs < 900000) & (costs > 1e-9)
-        
-        if np.any(valid_mask):
-            valid_costs = costs[valid_mask]
-            v_min, v_max = np.min(valid_costs), np.max(valid_costs)
-        else:
-            v_min, v_max = 1e-6, 1.0
-            
-        safe_costs = np.maximum(costs, 1e-9)
+        x_idx, y_idx, z_idx = 0, 1, 2
 
-        # Plot with LogNorm
-        p = ax.scatter(
-            xs, ys, zs, 
-            c=safe_costs, 
-            cmap='jet', 
-            norm=LogNorm(vmin=v_min, vmax=v_max),
-            s=20, 
-            alpha=0.5
-        )
+        if F_cloud is not None:
+             ax.scatter(F_cloud[:, x_idx], F_cloud[:, y_idx], F_cloud[:, z_idx], s=5, c='lightgray', alpha=0.2)
+        sc = ax.scatter(F[:, x_idx], F[:, y_idx], F[:, z_idx], c=F[:, z_idx], cmap='viridis', s=40, depthshade=False)
         
-        # Set axis labels dynamically based on what was optimized
-        axis_names = []
-        for _, pt_name, axis_idx in points_map[:3]:
-            char = ['X', 'Y', 'Z'][axis_idx]
-            axis_names.append(f"{pt_name}.{char}")
-            
-        ax.set_xlabel(axis_names[0] if len(axis_names) > 0 else "Var 1")
-        ax.set_ylabel(axis_names[1] if len(axis_names) > 1 else "Var 2")
-        ax.set_zlabel(axis_names[2] if len(axis_names) > 2 else "Var 3")
-        
-        fig.colorbar(p, ax=ax, label="Objective Cost")
-        self.figures.append(fig)
+        ax.set_title("Pareto Front (3D)")
+        ax.set_xlabel(self.obj_names[x_idx])
+        ax.set_ylabel(self.obj_names[y_idx])
+        ax.set_zlabel(self.obj_names[z_idx])
+        fig.colorbar(sc, label=self.obj_names[z_idx])
+        plt.show()

@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional, Tuple
 
 # ours
 from models.vehicle import Vehicle
+from utils.misc import log_to_file
 
 class SolverBase:
     def __init__(self, vehicle: Vehicle, corner_id: Tuple[int, int]):
@@ -33,12 +34,22 @@ class SingleCornerSolver(SolverBase):
         is_front = (self.corner_id[1] == 0)
         if is_front and steer_mm is not None:
             kwargs['steer_mm'] = steer_mm
+        log_to_file(f"Solver input for {self.corner_id}: {kwargs}") 
 
         try:
             step_result = corner.solver.solve(**kwargs)
+            
             if step_result is not None:
-                step_result.update(kwargs) 
-            return step_result
+                step_result.update(kwargs)
+                return step_result
+            else:
+                log_to_file(f"[WARN] Solver returned None for {self.corner_id} at {kwargs}")
+                return None
+                
         except TypeError as e:
-            print(f"Solver Error on corner {self.corner_id}: {e}")
+            log_to_file(f"[ERROR] Type Error on corner {self.corner_id}: {e} | Params: {kwargs}")
+            return None
+            
+        except Exception as e:
+            log_to_file(f"[CRASH] Geometric Solver failed on {self.corner_id}: {e} | Params: {kwargs}")
             return None
