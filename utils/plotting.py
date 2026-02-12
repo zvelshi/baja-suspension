@@ -339,9 +339,8 @@ class ParetoPlotter:
             cloud_list = []
             for algo in history:
                 if hasattr(algo, 'pop'):
-                    # Filter out failed runs (1e6)
                     valid_pop = algo.pop.get("F")
-                    valid_pop = valid_pop[valid_pop[:, 0] < 900000] 
+                    valid_pop = valid_pop[valid_pop[:, 0] < 1e3] 
                     if len(valid_pop) > 0:
                         cloud_list.append(valid_pop)
             

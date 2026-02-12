@@ -8,6 +8,7 @@ from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
+from pymoo.operators.mutation.pm import PolynomialMutation
 
 # ours
 from models.vehicle import Vehicle
@@ -54,15 +55,15 @@ class SuspensionProblem(ElementwiseProblem):
             results = sim_cache[s_type]
 
             if not results:
-                log_to_file(f"  [FAIL] {obj.name}: Invalid Geometry (Cost=1e6)")
-                costs.append(1e6)
+                log_to_file(f"  [FAIL] {obj.name}: Invalid Geometry (Cost=1e2)")
+                costs.append(1e2)
             else:
                 try:
                     val = obj.calculate_cost(results)
                     costs.append(val)
                 except Exception as e:
                     log_to_file(f"  [ERROR] {obj.name} cost calc failed: {e}")
-                    costs.append(1e6)
+                    costs.append(1e2)
 
         out["F"] = np.array(costs)
 
@@ -157,7 +158,7 @@ class SuspensionOptimizer:
 
         raise ValueError(f"Unknown scenario type: {key}")
 
-def run(self):
+    def run(self):
         """
         Main optimization routine.
         """
@@ -169,6 +170,8 @@ def run(self):
         
         pop_size = self.config.get("POP_SIZE", 40)
         n_offsprings = self.config.get("N_OFFSPRINGS", 10)
+        prob = self.config.get("M_PROB", 1.0)
+        eta = self.config.get("M_ETA", 15)
         
         print(f"Optimizing {num_vars} variables for {num_objs} objectives.")
         print(f"Population: {pop_size} | Offspring/Gen: {n_offsprings}")
@@ -187,6 +190,7 @@ def run(self):
             pop_size=pop_size,
             n_offsprings=n_offsprings,
             sampling=initial_pop,
+            mutation=PolynomialMutation(prob=prob, eta=eta),
             eliminate_duplicates=True
         )
 

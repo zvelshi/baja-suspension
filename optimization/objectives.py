@@ -25,11 +25,10 @@ class OptimizationObjective(ABC):
 
 class MinimumBumpSteer(OptimizationObjective):
     def calculate_cost(self, results):
-        # Extract toe values
         toes = np.array([get_toe_angle(step) for step in results])
         max_abs_toe = np.max(np.abs(toes))
         toe_range = np.max(toes) - np.min(toes)
-        return max_abs_toe + toe_range
+        return (max_abs_toe + toe_range)/150.0
 
     def get_scenario_type(self):
         return 'travel'
@@ -38,7 +37,7 @@ class ParallelSteer(OptimizationObjective):
     def calculate_cost(self, results):
         pcts = np.array([step['ackermann_pct'] for step in results])
         rmse = np.sqrt(np.mean(pcts**2))
-        return rmse
+        return rmse/1400.0
     
     def get_scenario_type(self):
         return 'ackermann'
