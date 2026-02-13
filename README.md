@@ -1,65 +1,108 @@
-### Prereq set up:
-1. You'll need to install Python: https://www.python.org/downloads/ **IMPORTANT** make sure you check the box that asks if you want python.exe added to PATH
-2. Click the <> Code button above on this repo
-3. click Download ZIP
-4. Unzip it in your location of choice
-5. Enter the baja-suspension folder in your file browser
-6. Right click anywhere inside the folder and click 'Open in Terminal'
- * This might not work the same way on windows 10, but the goal is to be in the baja-suspension folder in a terminal. You can also just copy its path and cd to the path, or open the folder in VScode and open a terminal in there
-7. Once you're in the terminal, do the following set up steps
+# Baja Suspension Simulation & Optimization Tool
 
-### To set up:
-1. Create and activate a virtual environment
-```
-python -m venv venv
-venv\Scripts\activate # or 'source venv/bin/activate' on Mac
-```
-2. Install the dependencies and setup package
-```
-pip install -e .
-```
+A Python-based simulation suite for designing, analyzing, and optimizing off-road vehicle suspension geometry. This tool provides kinematic analysis, quasi-static dynamic terrain simulation, and hardpoint optimization for **Double A-Arm** (Front) and **Semi-Trailing Link** (Rear) suspension types.
 
-You will only need to do the set up steps once. After that, to run it, you can:
-1. open the baja-suspension folder
-2. right click and 'Open in Terminal'
-3. Type `venv\Scripts\activate` to activate the venv
-4. Then do the following from the 'To Run' section (you can mix and match different parameters as needed, or try the examples below)
+## Key Features
 
-### To run:
-1. Set the simulation configuration in `kin_config.yml`
+* **Kinematic Analysis (`kin`)**:
+    * Sweep suspension through Travel (Bump/Droop) and Steering.
+    * Calculate key metrics: Camber, Caster, Toe, and CV Joint angles.
+    * **Ackermann Geometry**: Analyze steering geometry percentages and curves across the full rack travel.
+* **Dynamic Simulation (`dyn`)**:
+    * **Live 3D Visualization**: Watch the vehicle drive over procedural terrain in real-time.
+    * **Quasi-Static Solver**: Solves for chassis equilibrium (Heave, Pitch, Roll) at every step to ensure wheels track the terrain accurately.
+    * **Terrain Generation**: Configurable sine-wave profiles to simulate "whoops" or rough terrain.
+* **Optimization (`opt`)**:
+    * Optimize hardpoint locations to minimize specific objectives like Bump Steer.
+    * Support for multi-objective optimization using genetic algorithms.
 
-- For example, to run a simulation of the **front suspension** with **2026 hardpoints**, set the following in `kin_config.yml`
-    ```yml
-    HARDPOINTS: '2026'
-    SIM_STEPS:  330 
-    SIMULATION: 'steer_travel' # 'steer', 'steer_travel', 'travel', 'ackermann'
+---
 
-    HALF: 'front' # 'front' or 'rear'
-    SIDE: 'right' # 'left' or 'right'
+## Installation
 
-    TRAVEL:
-    MIN: -90  # [mm] Min range to sweep TRAVEL through during sim 
-    MAX:  240 # [mm] Max for range to sweep TRAVEL through during sim
+### Prerequisites
+* **Python 3.8+** installed. (Ensure "Add Python to PATH" is checked during installation).
 
-    STEER: 
-    MIN: -40 # [mm] Min for range to sweep STEER through during sim
-    MAX:  40 # [mm] Max for range to sweep STEER through during sim
+### Setup Steps
+1.  **Clone or Download** this repository.
+2.  Open a terminal in the project folder (`baja-suspension`).
+3.  **Create and Activate a Virtual Environment**:
+    ```bash
+    # Windows
+    python -m venv venv
+    venv\Scripts\activate
 
-    PLOTS:
-    3D:           True
-    CAMBER:       True
-    TOE:          True
-    CASTER:       True
-    AXLE_PLUNGE:  True
-    AXLE_ANGLES:  True
+    # Mac/Linux
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+4.  **Install Dependencies**:
+    ```bash
+    pip install -e .
     ```
 
-2. 
-- Run the single simulation script via
-    ```python
-    py main.py sim
-    ```
-- Run the global optimizer script via
-    ```python
-    py main.py opt
-    ```
+---
+
+## Usage Modes
+
+The tool is run via `main.py` with a specific command mode: `kin`, `dyn`, or `opt`.
+
+### 1. Kinematic Analysis
+Runs a geometric sweep of the suspension. Best for validating hardpoints and checking kinematic curves.
+
+```bash
+python main.py kin
+```
+- **Config File**: `config/kin_config.yml`
+- **Output**: Interactive 3D plots and 2D charts for Camber, Toe, and Caster curves
+
+### 2. Dynamic Simulation
+Runs a "Live" simulation of the vehicle driving over terrain.
+
+```bash
+python main.py dyn
+```
+- **Config File**: `config/dyn_config.yml` (Controls speed and terrain shape).
+- **Config File**: `config/kin_config.yml` (Selects the vehicle hardpoints).
+- **Output**: A real-time animated dashboard showing the vehicle geometry and shock travel logs.
+
+### 3. Optimization
+Runs the genetic optimizer to refine hardpoint locations.
+
+```bash
+python main.py opt
+```
+- **Config File**: `config/opt_config.yml`.
+- **Output**: Pareto-optimal solutions logged to the terminal and visualized via Pareto plots.
+
+## Configuration Guide
+`config/kin_config.yml`
+
+Controls the kinematic sweep parameters.
+
+```yml
+HARDPOINTS: '2026'      # Filename in config/hardpoints/ (e.g. 2026.yml)
+SIM_STEPS:  330         # Resolution of the sweep
+SIMULATION: 'travel'    # 'steer', 'travel', 'steer_travel', or 'ackermann'
+
+HALF: 'front'           # 'front' or 'rear'
+SIDE: 'right'           # 'left' or 'right'
+
+TRAVEL:
+  MIN: -90              # [mm] Max Droop (Extension)
+  MAX:  240             # [mm] Max Bump (Compression)
+```
+
+`config/dyn_config.yml`
+
+Controls the dynamic terrain simulation parameters.
+
+```yml
+VIZ_DT: 0.05            # [s] Time between visual frames
+DURATION: 60.0          # [s] Total simulation length
+VELOCITY: 10.0          # [m/s] Forward speed
+
+TERRAIN:
+  AMPLITUDE: 70.0       # [mm] Height of the bumps
+  FREQUENCY: 0.5        # [Hz] Spacing of the bumps
+```
