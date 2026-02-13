@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 # ours
-from models.joints.axle import Axle
-from models.joints.cv_joint import CVJoint, PlungingCVJoint
+from models.components.axle import Axle
+from models.components.cv_joint import CVJoint, PlungingCVJoint
 
 # third-party
 import numpy as np
@@ -158,10 +158,14 @@ class DoubleAArmNumeric:
             "lbj": lbj,
             "ubj": ubj,
             "wc": wc,
+            "s_ib": hp.s_ib,
             "s_ob": sha,
+            "piv_ib": hp.piv_ib,
+            "piv_ob": piv_ob,
             "tr_ib": tr_ib_offset,
             "tr_ob": tr_ob,
             "wheel_axis": n_ob,
             "axle_data": axle_state,
+            "shock_length": np.linalg.norm(hp.s_ib - sha),
         }
         return step

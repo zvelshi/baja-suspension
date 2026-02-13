@@ -1,0 +1,8 @@
+SOL_DT: 0.002 # [s]
+VIZ_DT: 0.05 # [s]
+DURATION: 15.0 # [s]
+VELOCITY: 2.0 # [m/s]
+
+TERRAIN:
+  AMPLITUDE: 70.0 # [mm]
+  FREQUENCY: 0.5 # [Hz]

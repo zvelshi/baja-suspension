@@ -8,14 +8,14 @@ import yaml
 # ours
 import optimization.objectives as opt_objs
 from models.vehicle import Vehicle
-from simulations.scenarios import SuspensionSweep, AckermannScenario
+from simulations.scenarios import SuspensionSweep, AckermannScenario, DynamicScenario
 from optimization.engine import SuspensionOptimizer
-from utils.plotting import Plotter, ParetoPlotter
+from utils.plotting import Plotter, ParetoPlotter, DynamicPlotter
 from utils.misc import setup_logging, log_to_file, save_configs
 
-def load_vehicle(sim_config_path: str):
+def load_vehicle(kin_config_path: str):
     """Helper to load config and vehicle objects."""
-    with open(sim_config_path, "r") as f:
+    with open(kin_config_path, "r") as f:
         config = yaml.safe_load(f)
     
     hp_file = f"config/hardpoints/{config['HARDPOINTS']}.yml"
@@ -25,8 +25,8 @@ def load_vehicle(sim_config_path: str):
     vehicle = Vehicle(hp_data)
     return vehicle, config
 
-def handle_simulation(args):
-    run_dir = setup_logging("sim")
+def handle_kinsim(args):
+    run_dir = setup_logging("kin_sim")
     
     print(f"--- Simulation Mode: {args.config} ---")
     log_to_file(f"Loaded configuration arguments: {args}")
@@ -83,11 +83,11 @@ def handle_optimization(args):
     print(f"--- Optimization Mode ---")
     log_to_file("Initializing optimization sequence...")
     
-    vehicle, sim_config = load_vehicle(args.sim_config)
+    vehicle, kin_config = load_vehicle(args.kin_config)
     with open(args.opt_config, "r") as f:
         opt_config = yaml.safe_load(f)
-    config = {**sim_config, **opt_config}
-    save_configs(run_dir, [args.sim_config, args.opt_config], sim_config.get('HARDPOINTS'))
+    config = {**kin_config, **opt_config}
+    save_configs(run_dir, [args.kin_config, args.opt_config], kin_config.get('HARDPOINTS'))
 
     obj_names = config.get("OBJECTIVES", [])
     objectives = []
@@ -116,13 +116,11 @@ def handle_optimization(args):
     print(f"Pareto Set Found: {len(res.X)} solutions")
     print("="*50)
     
-    # Ensure F is always 2D for consistent indexing
     if res.F.ndim == 1:
         F_safe = res.F.reshape(-1, 1)
     else:
         F_safe = res.F
 
-    # Print Pareto solutions
     for i, (f_vec, x) in enumerate(zip(F_safe, res.X)):
         f_str = ", ".join([f"{val:.4f}" for val in f_vec])
         log_to_file(f"Detailed Solution {i}: Vars={x}") 
@@ -133,23 +131,50 @@ def handle_optimization(args):
     plotter = ParetoPlotter(optimizer, save_dir=run_dir)
     plotter.plot_front(res, history=res.history)
 
+def handle_dynsim(args):
+    run_dir = setup_logging("dyn_sim")
+    print(f"--- Dynamic Simulation Mode ---")
+    
+    with open(args.dyn_config, "r") as f:
+        dyn_config = yaml.safe_load(f)
+    vehicle, kin_config = load_vehicle(args.kin_config)
+    config = {**kin_config, **dyn_config}
+    save_configs(run_dir, [args.kin_config, args.dyn_config], config.get('HARDPOINTS'))
+
+    scenario = DynamicScenario(vehicle, config)
+    results = scenario.run()
+
+    if not results:
+        print("Dynamic run produced no results.")
+        return
+
+    print(f"-> Starting Animation ({len(results)} frames)...")
+    plotter = DynamicPlotter(title="Dynamic Run", save_dir=run_dir)
+    plotter.animate(results, vehicle, config)
+
 def main():
     parser = argparse.ArgumentParser(description="Suspension Simulation & Optimization Tool")
     subparsers = parser.add_subparsers(dest="command", help="Mode of operation")
     
-    sim_parser = subparsers.add_parser("sim", help="Run a kinematic simulation")
-    sim_parser.add_argument("--config", type=str, default="config/sim_config.yml", help="Path to sim config")
+    sim_parser = subparsers.add_parser("kin", help="Run a kinematic simulation")
+    sim_parser.add_argument("--config", type=str, default="config/kin_config.yml", help="Path to sim config")
 
     opt_parser = subparsers.add_parser("opt", help="Run the optimizer")
-    opt_parser.add_argument("--sim_config", type=str, default="config/sim_config.yml", help="Base sim config")
+    opt_parser.add_argument("--kin_config", type=str, default="config/kin_config.yml", help="Base sim config")
     opt_parser.add_argument("--opt_config", type=str, default="config/opt_config.yml", help="Optimization config")
+
+    dyn_parser = subparsers.add_parser("dyn", help="Run dynamic terrain simulation")
+    dyn_parser.add_argument("--kin_config", type=str, default="config/kin_config.yml", help="Base config")
+    dyn_parser.add_argument("--dyn_config", type=str, default="config/dyn_config.yml", help="Dynamic parameters")
 
     args = parser.parse_args()
 
-    if args.command == "sim":
-        handle_simulation(args)
+    if args.command == "kin":
+        handle_kinsim(args)
     elif args.command == "opt":
         handle_optimization(args)
+    elif args.command == "dyn":
+        handle_dynsim(args)
     else:
         parser.print_help()
         sys.exit(1)

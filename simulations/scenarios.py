@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 
 # third-party
 import numpy as np
+import scipy.optimize
 
 # ours
 from .solvers import SingleCornerSolver
@@ -124,4 +125,68 @@ class AckermannScenario(Scenario):
             else:
                 log_to_file(f"[WARN] Ackermann step failed at input {input:.2f}. Left={bool(left)}, Right={bool(right)}")
                 
+        return results
+
+class DynamicScenario(Scenario):
+    """
+    Simulates the vehicle driving over a single sinusoidal terrain profile.
+    CoG height is fixed at the design height, but moves longitudinally.
+    """
+    def __init__(self, vehicle, config):
+        self.vehicle = vehicle
+        self.config = config
+
+        self.solvers = {
+            'fl': SingleCornerSolver(vehicle, [0, 0]),
+            'fr': SingleCornerSolver(vehicle, [1, 0]),
+            'rl': SingleCornerSolver(vehicle, [0, 1]),
+            'rr': SingleCornerSolver(vehicle, [1, 1]),
+        }
+
+    def _get_terrain_height_mm(self, x_mm: float) -> float:
+        """Calculates terrain Z using a single sine wave."""
+        t_cfg = self.config['TERRAIN']
+        x_m = x_mm / 1000.0
+        z_mm = t_cfg['AMPLITUDE'] * np.sin(2 * np.pi * t_cfg['FREQUENCY'] * x_m)
+        return z_mm
+
+    def run(self) -> List[Dict]:
+        results = []
+        sol_dt = self.config['SOL_DT']
+        viz_dt = self.config['VIZ_DT']
+
+        total_time = self.config['DURATION']
+        velocity = -self.config['VELOCITY'] * 1000.0 # [mm/s]
+
+        sub_steps = int(viz_dt / sol_dt)
+        total_render_frames = int(total_time / viz_dt)
+        print(f"--- Running Kinematic Sim ---")
+
+        for i in range(total_render_frames):
+            t_render = i * viz_dt
+            car_x = velocity * t_render
+
+            for _ in range(sub_steps):
+                # Physics 
+                pass
+            
+            step_data = {
+                'time': t_render,
+                'x_pos': car_x,
+                'cog_z': self.vehicle.cog[2],
+                'cog_x': self.vehicle.front_left.hardpoints.wc[0] + (self.vehicle.cog[0] * self.vehicle.sprung_bias_f),
+                'corners': {}
+            }
+            
+            for name, solver in self.solvers.items():
+                corner = self.vehicle.get_corner_from_id(solver.corner_id)
+                wx = car_x + corner.hardpoints.wc[0]
+                ground_z = self._get_terrain_height_mm(wx)
+                bump_z = ground_z - (self.vehicle.cog[2] - corner.hardpoints.wr) 
+
+                res = solver.solve(steer_mm=0.0, bump_z=bump_z)
+                if res:
+                    step_data['corners'][name] = res
+            
+            results.append(step_data)
         return results

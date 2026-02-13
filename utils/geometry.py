@@ -22,6 +22,8 @@ def get_toe_angle(step: Dict) -> float:
     return -np.rad2deg(toe_rad)
 
 def get_caster_angle(step: Dict) -> float:
+    if "ubj" not in step or "lbj" not in step:
+        return 0.0
     v = step["ubj"] - step["lbj"]
     return np.rad2deg(np.arctan2(v[0], v[2]))
  

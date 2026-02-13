@@ -26,9 +26,9 @@ You will only need to do the set up steps once. After that, to run it, you can:
 4. Then do the following from the 'To Run' section (you can mix and match different parameters as needed, or try the examples below)
 
 ### To run:
-1. Set the simulation configuration in `sim_config.yml`
+1. Set the simulation configuration in `kin_config.yml`
 
-- For example, to run a simulation of the **front suspension** with **2026 hardpoints**, set the following in `sim_config.yml`
+- For example, to run a simulation of the **front suspension** with **2026 hardpoints**, set the following in `kin_config.yml`
     ```yml
     HARDPOINTS: '2026'
     SIM_STEPS:  330 

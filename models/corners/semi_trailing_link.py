@@ -2,8 +2,8 @@
 from typing import Dict
 
 # ours
-from models.joints.axle import Axle
-from models.joints.cv_joint import CVJoint, PlungingCVJoint
+from models.components.axle import Axle
+from models.components.cv_joint import CVJoint, PlungingCVJoint
 
 # third-party
 import numpy as np
@@ -146,6 +146,7 @@ class SemiTrailingLinkNumeric:
             "tl_f": hp.tl_f,
             "tl_f_upright": tl_f_current,
             "wheel_axis": n_ob,
-            "axle_data": axle_state
+            "axle_data": axle_state,
+            "shock_length": np.linalg.norm(hp.s_ib - s_ob_w),
         }        
         return step

@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Optional
 # third-party
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from matplotlib.animation import FuncAnimation
 
 # ours
 from models.hardpoints import DoubleAArm, SemiTrailingLink
@@ -410,4 +410,147 @@ class ParetoPlotter:
         ax.set_ylabel(self.obj_names[y_idx])
         ax.set_zlabel(self.obj_names[z_idx])
         fig.colorbar(sc, label=self.obj_names[z_idx])
+        plt.show()
+
+class DynamicPlotter(Plotter):
+    """
+    Creates an animated dashboard showing the suspension geometry and kinematics over time.
+    """
+    def animate(self, steps: List[Dict], vehicle, config):
+        if not steps: return
+
+        interval = config['VIZ_DT'] 
+        
+        fig = plt.figure(figsize=(18, 12)) 
+        gs = fig.add_gridspec(3, 2, width_ratios=[2, 1]) 
+        
+        ax3d = fig.add_subplot(gs[:, 0], projection='3d')
+        ax_camber = fig.add_subplot(gs[0, 1])
+        ax_caster = fig.add_subplot(gs[1, 1])
+        ax_toe    = fig.add_subplot(gs[2, 1])
+
+        corners = ['fl', 'fr', 'rl', 'rr']
+        styles  = {'fl': 'b-', 'fr': 'r-', 'rl': 'b--', 'rr': 'r--'}
+        labels  = {'fl': 'FL', 'fr': 'FR', 'rl': 'RL', 'rr': 'RR'}
+        data_store = {c: {'camber': [], 'caster': [], 'toe': [], 'time': []} for c in corners}
+        
+        for s in steps:
+            t = s['time']
+            for c_name in corners:
+                if c_name in s['corners']:
+                    att = get_wheel_attitude(s['corners'][c_name])
+                    data_store[c_name]['camber'].append(att['camber'])
+                    data_store[c_name]['caster'].append(att['caster'])
+                    data_store[c_name]['toe'].append(att['toe'])
+                    data_store[c_name]['time'].append(t)
+                else:
+                    if len(data_store[c_name]['time']) > 0:
+                        data_store[c_name]['camber'].append(np.nan)
+                        data_store[c_name]['caster'].append(np.nan)
+                        data_store[c_name]['toe'].append(np.nan)
+                        data_store[c_name]['time'].append(t)
+
+        lines_camber = {}
+        lines_caster = {}
+        lines_toe = {}
+
+        for c_name in corners:
+            ln_cam, = ax_camber.plot([], [], styles[c_name], lw=1.5, label=labels[c_name])
+            ln_toe, = ax_toe.plot([], [], styles[c_name], lw=1.5)
+            lines_camber[c_name] = ln_cam
+            lines_toe[c_name] = ln_toe
+
+            if 'f' in c_name:
+                ln_cas, = ax_caster.plot([], [], styles[c_name], lw=1.5)
+                lines_caster[c_name] = ln_cas
+
+        ax_camber.set_title("Camber [deg]"); ax_camber.grid(True); ax_camber.legend(loc='upper right', ncol=2, fontsize='small')
+        ax_caster.set_title("Front Caster [deg]"); ax_caster.grid(True)
+        ax_toe.set_title("Toe [deg]"); ax_toe.set_xlabel("Time [s]"); ax_toe.grid(True)
+
+        for ax, key, subset in zip([ax_camber, ax_caster, ax_toe], ['camber', 'caster', 'toe'], [corners, ['fl','fr'], corners]):
+            all_vals = []
+            for c in subset: all_vals.extend(data_store[c][key])
+            all_vals = [v for v in all_vals if not np.isnan(v)]
+            if all_vals:
+                ax.set_ylim(min(all_vals)-1, max(all_vals)+1)
+                ax.set_xlim(0, steps[-1]['time'])
+
+        def draw_terrain(ax, current_x_mm):
+            x_range_mm = np.linspace(current_x_mm - 4000, current_x_mm + 4000, 80)
+            
+            t_cfg = config['TERRAIN']
+            x_m = x_range_mm / 1000.0
+            z_mm = t_cfg['AMPLITUDE'] * np.sin(2 * np.pi * t_cfg['FREQUENCY'] * x_m)
+            
+            y_width_mm = 1200.0 
+            X, Y = np.meshgrid(x_range_mm, np.array([-y_width_mm, y_width_mm]))
+            Z = np.vstack([z_mm, z_mm])
+            ax.plot_wireframe(X, Y, Z, color='green', alpha=0.1, rstride=10, cstride=5)
+
+        def update(frame):
+            step = steps[frame]
+            t = step['time']
+            car_x = step['x_pos']
+
+            for c_name in corners:
+                ts = data_store[c_name]['time']
+                if frame < len(ts):
+                    lines_camber[c_name].set_data(ts[:frame], data_store[c_name]['camber'][:frame])
+                    lines_toe[c_name].set_data(ts[:frame], data_store[c_name]['toe'][:frame])
+                    if c_name in lines_caster:
+                        lines_caster[c_name].set_data(ts[:frame], data_store[c_name]['caster'][:frame])
+
+            ax3d.cla()
+            ax3d.set_title(f"Sim")
+            
+            draw_terrain(ax3d, car_x)
+            
+            cg_lx = step['cog_x']
+            cg_vz = step['cog_z']
+            ax3d.scatter(
+                [car_x + cg_lx], [0], [cg_vz], 
+                color='black', marker='D', s=180, label="CoG", zorder=100
+            )
+
+            global_offset = np.array([car_x, 0, 0])
+
+            for corner_name, corner_data in step['corners'].items():
+                is_front = 'f' in corner_name
+                is_left = 'l' in corner_name
+                
+                if is_front:
+                    hp_static = vehicle.front_left.hardpoints if is_left else vehicle.front_right.hardpoints
+                else:
+                    hp_static = vehicle.rear_left.hardpoints if is_left else vehicle.rear_right.hardpoints
+
+                shifted_step = {}
+                for k, v in corner_data.items():
+                    if k == 'wheel_axis':
+                        shifted_step[k] = v
+                    elif isinstance(v, np.ndarray) and v.shape == (3,):
+                        shifted_step[k] = v + global_offset
+                    else:
+                        shifted_step[k] = v
+
+                class ShiftedHP: pass
+                shp = ShiftedHP()
+                for k, v in hp_static.__dict__.items():
+                    if isinstance(v, np.ndarray) and v.shape == (3,):
+                        setattr(shp, k, v + global_offset)
+                    else:
+                        setattr(shp, k, v)
+
+                if is_front:
+                    self._render_double_a_arm(ax3d, shifted_step, shp, color_main='blue' if is_left else 'red')
+                else:
+                    self._render_semi_trailing(ax3d, shifted_step, shp, color_main='blue' if is_left else 'red')
+
+            ax3d.set_xlim(car_x - 2000, car_x + 2000)
+            ax3d.set_ylim(-1000, 1000)
+            ax3d.set_zlim(-100, 1100)
+            ax3d.set_box_aspect([4, 2, 1.2]) 
+
+        ani = FuncAnimation(fig, update, frames=len(steps), interval=interval, blit=False)
+        plt.tight_layout()
         plt.show()

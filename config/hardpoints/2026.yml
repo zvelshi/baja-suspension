@@ -1,13 +1,31 @@
 # 2026 hardpoints - 2025-09-13
 
 baja_2026:
-  shock_min: 327.025
-  shock_max: 504.825
-  wheel_radius: 300 # ~23in diameter
-  wheel_width: 200 # ~8in width
+  shock_min: 327.025 # [mm]
+  shock_max: 504.825 # [mm]
+  wheel_radius: 292.100 # [mm]
+  wheel_width: 203.200 # [mm]
+
+  sprung_mass: # [kg]
+    fl: 31.324
+    fr: 24.244
+    rl: 31.440
+    rr: 40.126
+  unsprung_mass: # [kg]
+    fl: 17.986
+    fr: 17.986
+    rl: 14.820
+    rr: 14.534
 
   front:
     _type: 'DoubleAArm'
+
+    # shocks setup
+    shock_setup:
+      spring_rate: 14 # [N/mm]
+      damping_rate: 10 # [N*s/mm]
+      preload: 0.0 # [mm]
+      free_length: 254 # [mm]
 
     # inboard a arm points
     upper_a_arm_front: [0.000, 220.000, 577.451]
@@ -37,6 +55,13 @@ baja_2026:
 
   rear:
     _type: 'SemiTrailingLink'
+
+    # shocks setup
+    shock_setup:
+      spring_rate: 19 # [N/mm]
+      damping_rate: 10 # [N*s/mm]
+      preload: 0.0 # [mm]
+      free_length: 254 # [mm]
 
     # trailing link point
     trailing_link_front: [1230.000, 288.473, 351.437]
