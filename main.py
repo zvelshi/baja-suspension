@@ -44,7 +44,7 @@ def handle_kinsim(args):
         print("-> Running Ackermann Steering Geometry Analysis...")
         scenario = AckermannScenario(vehicle, config)
     
-    elif sim_type in ["steer", "travel", "steer_travel"]:
+    elif sim_type in ["steer", "travel", "steer_travel", "droop_steer", "jounce_steer"]:
         corner_id = [0, 0]
         if config["HALF"] == 'rear':
             corner_id[1] = 1
