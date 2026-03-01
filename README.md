@@ -1,4 +1,4 @@
-# Baja Suspension Simulation & Optimization Tool
+# Kinematic Suspension Simulation/Optimization Tool
 
 A Python-based simulation suite for designing, analyzing, and optimizing off-road vehicle suspension geometry. This tool provides kinematic analysis, quasi-static dynamic terrain simulation, and hardpoint optimization for **Double A-Arm** (Front) and **Semi-Trailing Link** (Rear) suspension types.
 
