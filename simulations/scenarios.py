@@ -3,7 +3,6 @@ from typing import List, Dict, Any
 
 # third-party
 import numpy as np
-import scipy.optimize
 
 # ours
 from .solvers import SingleCornerSolver
@@ -74,6 +73,28 @@ class SuspensionSweep(Scenario):
                     steps.append(res)
                 else:
                     log_to_file(f"[WARN] Combined sweep step failed at steer={s:.2f}, travel={t:.2f}")
+
+        elif sim_type == "droop_steer":
+            steer_vals = get_range('STEER')
+            for s in steer_vals:
+                res = self.solver.solve(steer_mm=s, travel_mm=self.config["TRAVEL"]["MIN"])
+                if res: 
+                    res['x_val'] = s
+                    res['x_label'] = "Rack Travel [mm]"
+                    steps.append(res)
+                else:
+                    log_to_file(f"[WARN] Steer sweep step failed at {s:.2f}mm")
+
+        elif sim_type == "jounce_steer":
+            steer_vals = get_range('STEER')
+            for s in steer_vals:
+                res = self.solver.solve(steer_mm=s, travel_mm=self.config["TRAVEL"]["MAX"])
+                if res: 
+                    res['x_val'] = s
+                    res['x_label'] = "Rack Travel [mm]"
+                    steps.append(res)
+                else:
+                    log_to_file(f"[WARN] Steer sweep step failed at {s:.2f}mm")
                   
         return steps
 
@@ -124,6 +145,12 @@ class AckermannScenario(Scenario):
                 })
             else:
                 log_to_file(f"[WARN] Ackermann step failed at input {input:.2f}. Left={bool(left)}, Right={bool(right)}")
+                results.append({
+                    "input": input,
+                    "left": left,
+                    "right": right,
+                    "ackermann_pct": np.nan,
+                })
                 
         return results
 

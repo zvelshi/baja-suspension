@@ -334,15 +334,27 @@ class ParetoPlotter:
         if F.ndim == 1:
             F = F.reshape(-1, 1)
             
+        valid_mask = np.all(F <= 1e2, axis=1)
+        F = F[valid_mask]
+
+        if len(F) == 0:
+            print("No solutions found with cost <= 1e2.")
+            return
+
         F_cloud = None
         if history:
             cloud_list = []
             for algo in history:
                 if hasattr(algo, 'pop'):
-                    valid_pop = algo.pop.get("F")
-                    valid_pop = valid_pop[valid_pop[:, 0] < 1e3] 
-                    if len(valid_pop) > 0:
-                        cloud_list.append(valid_pop)
+                    pop_F = algo.pop.get("F")
+                    if pop_F is not None:
+                        if pop_F.ndim == 1:
+                            pop_F = pop_F.reshape(-1, 1)
+                        mask = np.all(pop_F <= 1e2, axis=1)
+                        valid_pop = pop_F[mask]
+                        
+                        if len(valid_pop) > 0:
+                            cloud_list.append(valid_pop)
             
             if cloud_list:
                 F_cloud = np.vstack(cloud_list)
@@ -355,6 +367,7 @@ class ParetoPlotter:
             self._plot_2d_front(F, F_cloud)
         elif n_obj >= 3:
             self._plot_multidim_front(F, F_cloud)
+        self._save_plot("front")
 
     def _plot_1d_front(self, F, F_cloud=None):
         fig, ax = plt.subplots(figsize=(8, 6))

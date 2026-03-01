@@ -4,6 +4,7 @@ from typing import Dict
 # ours
 from models.components.axle import Axle
 from models.components.cv_joint import CVJoint, PlungingCVJoint
+from utils.misc import log_to_file
 
 # third-party
 import numpy as np
@@ -63,6 +64,7 @@ class SemiTrailingLinkNumeric:
 
         targ_shock = self._shock_0 - travel_mm if travel_mm is not None else None
         if targ_shock is not None and not (hp.shock_min <= targ_shock <= hp.shock_max):
+            log_to_file(f"[WARN] Target shock length {targ_shock:.2f}mm out of bounds ({hp.shock_min}-{hp.shock_max}mm)")
             return None
         targ_wcz = self._wc_z0 + bump_z if bump_z is not None else None
 

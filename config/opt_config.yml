@@ -1,7 +1,7 @@
 # GLOBAL OPTIMIZER
-POP_SIZE: 100
-N_OFFSPRINGS: 50
-MAX_GEN: 100
+POP_SIZE: 35
+N_OFFSPRINGS: 25
+MAX_GEN: 25
 M_PROB: 1.0
 M_ETA: 15
 
@@ -9,14 +9,15 @@ M_ETA: 15
 OBJECTIVES: 
   - MinimumBumpSteer
   - ParallelSteer
+  - NoCollision
 
 # PARAMETERS TO OPTIMIZE
 FREE_POINTS: 
-  "tr_ib":
-    x: [-50.0, 50.0]
-    y: [-20.0, 20.0]
+  "tie_rod_inboard":
+    x: [-50.0, 10.0]
+    y: [-50.0, 50.0]
+    z: [-40.0, 45.0]
+  "tie_rod_outboard":
+    x: [-20.0, 15.0]
+    y: [-50.0, 50.0]
     z: [-50.0, 50.0]
-  "tr_ob":
-    x: [-40.0, 40.0]
-    y: [-20.0, 5.0]
-    z: [-60.0, 0.0]

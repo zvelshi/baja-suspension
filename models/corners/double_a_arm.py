@@ -4,6 +4,7 @@ from __future__ import annotations
 # ours
 from models.components.axle import Axle
 from models.components.cv_joint import CVJoint, PlungingCVJoint
+from utils.misc import log_to_file
 
 # third-party
 import numpy as np
@@ -65,6 +66,7 @@ class DoubleAArmNumeric:
         hp = self.hp
         target_shock = self._shock0 - travel_mm if travel_mm is not None else None
         if target_shock and not (hp.shock_min <= target_shock <= hp.shock_max):
+            log_to_file(f"[WARN] Target shock length {target_shock:.2f}mm out of bounds ({hp.shock_min}-{hp.shock_max}mm)")
             return None
 
         target_wheel = self._wc0 + bump_z if bump_z is not None else None
@@ -157,6 +159,10 @@ class DoubleAArmNumeric:
         step = {
             "lbj": lbj,
             "ubj": ubj,
+            "uf": hp.uf,
+            "ur": hp.ur,
+            "lf": hp.lf,
+            "lr": hp.lr,
             "wc": wc,
             "s_ib": hp.s_ib,
             "s_ob": sha,

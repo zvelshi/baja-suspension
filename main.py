@@ -13,15 +13,18 @@ from optimization.engine import SuspensionOptimizer
 from utils.plotting import Plotter, ParetoPlotter, DynamicPlotter
 from utils.misc import setup_logging, log_to_file, save_configs
 
-def load_vehicle(kin_config_path: str):
-    """Helper to load config and vehicle objects."""
+def load_data_only(kin_config_path: str):
+    """Loads configuration dicts without instantiating the Vehicle."""
     with open(kin_config_path, "r") as f:
-        config = yaml.safe_load(f)
-    
-    hp_file = f"config/hardpoints/{config['HARDPOINTS']}.yml"
+        kin_config = yaml.safe_load(f)
+    hp_file = f"config/hardpoints/{kin_config['HARDPOINTS']}.yml"
     with open(hp_file, 'r') as f:
         hp_data = yaml.safe_load(f)
-        
+    return hp_data, kin_config
+
+def load_vehicle(kin_config_path: str):
+    """Helper to load config and vehicle objects."""
+    hp_data, config = load_data_only(kin_config_path)    
     vehicle = Vehicle(hp_data)
     return vehicle, config
 
@@ -79,16 +82,14 @@ def handle_kinsim(args):
 
 def handle_optimization(args):
     run_dir = setup_logging("opt")
-
     print(f"--- Optimization Mode ---")
-    log_to_file("Initializing optimization sequence...")
-    
-    vehicle, kin_config = load_vehicle(args.kin_config)
+
     with open(args.opt_config, "r") as f:
         opt_config = yaml.safe_load(f)
+    base_hp_data, kin_config = load_data_only(args.kin_config)
+
     config = {**kin_config, **opt_config}
     save_configs(run_dir, [args.kin_config, args.opt_config], kin_config.get('HARDPOINTS'))
-
     obj_names = config.get("OBJECTIVES", [])
     objectives = []
     print(f"-> Loading Objectives: {obj_names}")
@@ -98,14 +99,14 @@ def handle_optimization(args):
             obj_cls = getattr(opt_objs, name)
             objectives.append(obj_cls())
         except AttributeError:
-            print(f"FATAL ERROR: Objective class '{name}' not found in 'optimization.objectives'.")
+            print(f"FATAL ERROR: Objective class '{name}' not found.")
             return
 
     if not objectives:
         print("No objectives defined. Exiting.")
         return
 
-    optimizer = SuspensionOptimizer(vehicle, config, objectives)
+    optimizer = SuspensionOptimizer(base_hp_data, config, objectives)
     res = optimizer.run()
     
     if res.X is None:
@@ -127,7 +128,6 @@ def handle_optimization(args):
         print(f"Sol {i}: Costs = [{f_str}]")
 
     print(f"\n-> Plotting Results...")
-
     plotter = ParetoPlotter(optimizer, save_dir=run_dir)
     plotter.plot_front(res, history=res.history)
 
